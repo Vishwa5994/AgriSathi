@@ -799,7 +799,8 @@ export const AdminDashboard = () => {
                   min="0"
                   max="10"
                   value={commissionRate}
-                  onChange={(e) => setCommissionRate(Number(e.target.value))}
+                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => setCommissionRate(Math.max(0, Number(e.target.value) || 0))}
                   className="w-32 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-black text-emerald-800 focus:outline-none focus:border-emerald-600 focus:bg-white"
                 />
                 <span className="text-xs text-slate-500">Applied automatically to gross order totals</span>

@@ -39,7 +39,7 @@ export const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         {/* Brand Logo */}
         <Link
-          to={isAuthenticated ? (role === 'FARMER' ? '/farmer-dashboard' : '/buyer-dashboard') : '/'}
+          to="/"
           className="flex items-center gap-2.5 group shrink-0"
         >
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-700 via-emerald-600 to-amber-500 p-0.5 shadow-md group-hover:scale-105 transition-transform">

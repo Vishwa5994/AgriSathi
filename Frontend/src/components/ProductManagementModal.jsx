@@ -308,8 +308,10 @@ export const ProductManagementModal = ({ isOpen, onClose, initialMode = 'add', t
               </label>
               <input
                 type="number"
+                min="0"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                onWheel={(e) => e.target.blur()}
+                onChange={(e) => setQuantity(e.target.value < 0 ? '0' : e.target.value)}
                 placeholder="50"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold"
               />
@@ -321,8 +323,10 @@ export const ProductManagementModal = ({ isOpen, onClose, initialMode = 'add', t
               </label>
               <input
                 type="number"
+                min="0"
                 value={askingPrice}
-                onChange={(e) => setAskingPrice(e.target.value)}
+                onWheel={(e) => e.target.blur()}
+                onChange={(e) => setAskingPrice(e.target.value < 0 ? '0' : e.target.value)}
                 placeholder="2100"
                 className="w-full px-3.5 py-2.5 bg-emerald-50 border border-emerald-300 text-emerald-950 font-black rounded-xl text-lg focus:ring-2 focus:ring-emerald-500"
               />

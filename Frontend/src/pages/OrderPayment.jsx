@@ -296,7 +296,8 @@ export const OrderPayment = () => {
                     min="1"
                     max={listing.available_stock}
                     value={quantity}
-                    onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => setQuantity(Math.max(1, Math.abs(Number(e.target.value) || 1)))}
                     className="w-full px-3.5 py-2 bg-emerald-50 border border-emerald-300 font-extrabold text-emerald-950 rounded-xl text-lg text-center"
                   />
                   <p className="text-[11px] text-slate-400 text-center font-medium">

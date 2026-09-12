@@ -317,8 +317,10 @@ export const AddProduct = () => {
                 </label>
                 <input
                   type="number"
+                  min="0"
                   value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
+                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => setQuantity(e.target.value < 0 ? '0' : e.target.value)}
                   placeholder="50"
                   required
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:bg-white"
@@ -331,8 +333,10 @@ export const AddProduct = () => {
                 </label>
                 <input
                   type="number"
+                  min="0"
                   value={askingPrice}
-                  onChange={(e) => setAskingPrice(e.target.value)}
+                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => setAskingPrice(e.target.value < 0 ? '0' : e.target.value)}
                   placeholder="2100"
                   required
                   className="w-full px-4 py-3 bg-emerald-50 border border-emerald-300 text-emerald-950 font-black rounded-xl text-lg focus:ring-2 focus:ring-emerald-500"

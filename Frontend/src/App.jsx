@@ -29,7 +29,6 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { NotFound } from './pages/NotFound';
 
 const HomeRoute = () => {
-  const { isAuthenticated, role } = useAuth();
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -38,16 +37,6 @@ const HomeRoute = () => {
       navigate(`/login${window.location.hash}`, { replace: true });
     }
   }, [navigate]);
-
-  if (isAuthenticated) {
-    if (role === 'FARMER') {
-      return <Navigate to="/farmer-dashboard" replace />;
-    } else if (role === 'BUYER') {
-      return <Navigate to="/buyer-dashboard" replace />;
-    } else if (role === 'ADMIN') {
-      return <Navigate to="/admin-dashboard" replace />;
-    }
-  }
 
   return <Landing />;
 };
@@ -167,6 +156,45 @@ const AnimatedRoutes = () => {
 };
 
 export function App() {
+  React.useEffect(() => {
+    // Prevent negative sign key input, sanitize values < 0, and stop mouse wheel scroll value changes
+    const handleKeyDown = (e) => {
+      if (e.target && e.target.tagName === 'INPUT' && (e.target.type === 'number' || e.target.type === 'tel')) {
+        if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+          e.preventDefault();
+        }
+      }
+    };
+
+    const handleInput = (e) => {
+      if (e.target && e.target.tagName === 'INPUT' && e.target.type === 'number') {
+        if (e.target.value !== '' && Number(e.target.value) < 0) {
+          e.target.value = Math.max(0, parseFloat(e.target.value) || 0);
+        }
+      }
+    };
+
+    const handleWheel = (e) => {
+      if (
+        e.target &&
+        e.target.tagName === 'INPUT' &&
+        (e.target.type === 'number' || e.target.getAttribute('type') === 'number')
+      ) {
+        e.target.blur();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('input', handleInput);
+    window.addEventListener('wheel', handleWheel, { passive: true });
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('input', handleInput);
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
   return (
     <Router>
       <AuthProvider>
