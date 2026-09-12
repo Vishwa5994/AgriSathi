@@ -10,6 +10,8 @@ import { Button } from '../components/Button';
 import { PriceComparisonBadge } from '../components/PriceComparisonBadge';
 import { comparePriceToMandi } from '../utils/priceComparison';
 import { ImageFrameAdjuster } from '../components/ImageFrameAdjuster';
+import { predictionApi } from '../api/predictionApi';
+import { MarketPredictionChart } from '../components/MarketPredictionChart';
 import {
   Sprout,
   PlusCircle,
@@ -23,7 +25,9 @@ import {
   Package,
   Calendar,
   Sparkles,
-  Camera
+  Camera,
+  Bot,
+  ArrowRight
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -68,6 +72,10 @@ export const AddProduct = () => {
   // Price history for inline discovery widget
   const [priceHistoryData, setPriceHistoryData] = useState(null);
   const [loadingPriceWidget, setLoadingPriceWidget] = useState(false);
+
+  // ML Price Prediction state (from Python XGBoost Service)
+  const [mlPrediction, setMlPrediction] = useState(null);
+  const [loadingPrediction, setLoadingPrediction] = useState(false);
 
   useEffect(() => {
     if (user?.profile?.village) {
@@ -116,6 +124,38 @@ export const AddProduct = () => {
 
   const selectedProductObj = products.find((p) => p.product_id === selectedProductId) || products[0];
   const mandiAvgPrice = priceHistoryData?.current_mandi_avg || selectedProductObj?.mandi_avg_price || 2000;
+
+  // Fetch ML price prediction whenever product name changes
+  useEffect(() => {
+    let active = true;
+    const productName = selectedProductId === 'ADD_NEW'
+      ? customProductName
+      : selectedProductObj?.product_name;
+
+    if (!productName || !productName.trim()) {
+      setMlPrediction(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoadingPrediction(true);
+      try {
+        const pred = await predictionApi.predictPrice(productName.trim(), 3);
+        if (active) {
+          setMlPrediction(pred);
+        }
+      } catch (err) {
+        if (active) setMlPrediction(null);
+      } finally {
+        if (active) setLoadingPrediction(false);
+      }
+    }, 350);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [selectedProductId, customProductName, selectedProductObj?.product_name]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -344,57 +384,57 @@ export const AddProduct = () => {
                 />
               </div>
             </div>
+            {/* AI Suggested Price Panel */}
+            {loadingPrediction ? (
+              <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-xs text-emerald-800 animate-pulse">
+                <Bot className="w-4 h-4 text-emerald-600 animate-spin" />
+                <span>Analyzing recent Mandi trends & calculating XGBoost price forecast...</span>
+              </div>
+            ) : mlPrediction ? (
+              <div className="p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-300/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-emerald-900">
+                    <Sparkles className="w-4 h-4 text-amber-500 animate-bounce" />
+                    <span>AI Suggested Farmgate Price (Next Month Forecast)</span>
+                  </div>
+                  <p className="text-xs text-emerald-800">
+                    Recommended: <strong className="text-emerald-950 font-black text-sm">₹{mlPrediction.predicted_price}</strong> / {selectedProductObj?.unit || 'Kg'}
+                    <span className="text-slate-500 text-[11px] ml-2 font-normal">(Last known APMC actual: ₹{mlPrediction.current_price})</span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAskingPrice(String(mlPrediction.predicted_price));
+                    toast.success(`Applied AI recommended price of ₹${mlPrediction.predicted_price}`);
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Use This Price
+                </button>
+              </div>
+            ) : (
+              <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 flex items-center gap-1.5">
+                <span>ℹ️ Standard manual pricing mode active.</span>
+              </div>
+            )}
           </div>
 
-          {/* Live APMC Price Discovery Widget */}
-          <div className="p-6 bg-slate-900 text-white rounded-3xl space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <LineChartIcon className="w-5 h-5 text-amber-400" />
-                <span className="text-sm font-bold text-amber-300">
-                  {t('live_apmc_benchmark')}
-                </span>
-              </div>
-              <span className="text-xs text-slate-400 font-mono">
-                {priceHistoryData?.mandi_name || 'Regional APMC Benchmarks'}
-              </span>
-            </div>
-
-            <PriceComparisonBadge askingPrice={askingPrice} mandiAvgPrice={mandiAvgPrice} />
-
-            {loadingPriceWidget ? (
-              <div className="h-44 flex items-center justify-center text-xs text-slate-400">
-                {t('loading_mandi_chart')}
-              </div>
-            ) : priceHistoryData?.history ? (
-              <div className="h-44 w-full pt-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={priceHistoryData.history}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
-                    <YAxis stroke="#94a3b8" fontSize={11} domain={['auto', 'auto']} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="mandi_avg"
-                      name="APMC Mandi Avg (₹)"
-                      stroke="#f59e0b"
-                      strokeWidth={2.5}
-                      dot={{ r: 3 }}
-                    />
-                    <ReferenceLine
-                      y={Number(askingPrice) || 0}
-                      label={{ value: t('your_ask'), fill: '#10b981', fontSize: 11, fontWeight: 'bold' }}
-                      stroke="#10b981"
-                      strokeDasharray="4 4"
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : null}
+          {/* Machine Learning Price Forecast & Historical Trend Chart */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+              <LineChartIcon className="w-4 h-4 text-emerald-600" />
+              4. Machine Learning Price Forecast (12-Month History + 3-Month Projection)
+            </h3>
+            <MarketPredictionChart
+              historical={mlPrediction?.historical || []}
+              forecast={mlPrediction?.forecast || []}
+              commodityName={selectedProductObj?.product_name || 'Selected Crop'}
+              unit={`₹/${selectedProductObj?.unit || 'Kg'}`}
+              type="price"
+              height={220}
+            />
           </div>
 
           {/* Section 3: Harvest & Logistics */}

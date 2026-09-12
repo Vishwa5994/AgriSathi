@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { productsApi } from '../api/productsApi';
 import { priceHistoryApi } from '../api/priceHistoryApi';
 import { listingsApi } from '../api/listingsApi';
+import { chatApi } from '../api/chatApi';
 import { askOpenRouter } from '../api/openRouterApi';
 import {
   MessageCircle,
@@ -455,6 +456,27 @@ export const ChatAssistant = () => {
     setInput('');
     setIsTyping(true);
 
+    // 1. First Attempt: Backend RAG Grounded Chatbot (DB + ML Predictions + Gemini)
+    try {
+      const historyForBackend = messages.slice(-6).map(m => ({
+        role: m.from === 'user' ? 'user' : 'assistant',
+        content: m.text
+      }));
+      historyForBackend.push({ role: 'user', content: text });
+
+      const ragResponse = await chatApi.sendMessage(text, historyForBackend);
+      if (ragResponse && ragResponse.reply) {
+        const botMsg = { id: Date.now() + 1, from: 'bot', text: ragResponse.reply, time: new Date() };
+        setMessages(prev => [...prev, botMsg]);
+        setIsTyping(false);
+        speakText(ragResponse.reply);
+        return;
+      }
+    } catch (backendErr) {
+      console.warn('Backend RAG chat call failed, trying OpenRouter fallback:', backendErr.message);
+    }
+
+    // 2. Second Attempt: OpenRouter Gemini
     const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
     const hasOpenRouterKey = apiKey && apiKey !== 'YOUR_OPENROUTER_API_KEY_HERE';
 
@@ -482,14 +504,14 @@ export const ChatAssistant = () => {
       }
     }
 
-    // Fallback to local rule-based smart brain
+    // 3. Third Attempt: Local smart generator
     setTimeout(() => {
       const responseText = generateResponse(text, role, user);
       const botMsg = { id: Date.now() + 1, from: 'bot', text: responseText, time: new Date() };
       setMessages(prev => [...prev, botMsg]);
       setIsTyping(false);
       speakText(responseText);
-    }, 600);
+    }, 400);
   }, [input, messages, role, user, speakText]);
 
   const handleVoice = () => {

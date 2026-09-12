@@ -4,6 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useListings } from '../hooks/useListings';
 import { productsApi } from '../api/productsApi';
 import { priceHistoryApi } from '../api/priceHistoryApi';
+import { predictionApi } from '../api/predictionApi';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { PriceComparisonBadge } from './PriceComparisonBadge';
@@ -15,7 +16,9 @@ import {
   Trash2,
   LineChart as LineChartIcon,
   AlertTriangle,
-  Check
+  Check,
+  Sparkles,
+  TrendingUp
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -55,6 +58,10 @@ export const ProductManagementModal = ({ isOpen, onClose, initialMode = 'add', t
   // Price history for inline discovery widget
   const [priceHistoryData, setPriceHistoryData] = useState(null);
   const [loadingPriceWidget, setLoadingPriceWidget] = useState(false);
+
+  // ML Prediction state
+  const [predictedPriceData, setPredictedPriceData] = useState(null);
+  const [loadingPrediction, setLoadingPrediction] = useState(false);
 
   useEffect(() => {
     if (user?.profile?.village) {
@@ -112,6 +119,29 @@ export const ProductManagementModal = ({ isOpen, onClose, initialMode = 'add', t
   }, [selectedProductId]);
 
   const selectedProductObj = products.find((p) => p.product_id === selectedProductId) || products[0];
+  const commodityLookupName = selectedProductId === 'ADD_NEW' ? customProductName : (selectedProductObj?.product_name || 'Wheat');
+
+  // Debounced ML Price Prediction Fetch
+  useEffect(() => {
+    if (!commodityLookupName || commodityLookupName.trim().length < 2) {
+      setPredictedPriceData(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoadingPrediction(true);
+      try {
+        const pred = await predictionApi.predictPrice(commodityLookupName.trim(), 1);
+        setPredictedPriceData(pred);
+      } catch (err) {
+        setPredictedPriceData(null);
+      } finally {
+        setLoadingPrediction(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [commodityLookupName]);
   const mandiAvgPrice = priceHistoryData?.current_mandi_avg || selectedProductObj?.mandi_avg_price || 2000;
 
   const handleSubmit = async (e) => {
@@ -319,9 +349,17 @@ export const ProductManagementModal = ({ isOpen, onClose, initialMode = 'add', t
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-emerald-800 uppercase mb-1">
-                {t('asking_price_unit')}
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-emerald-800 uppercase">
+                  {t('asking_price_unit')}
+                </label>
+                {predictedPriceData?.predicted_price && (
+                  <span className="text-[11px] font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200 inline-flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-purple-600" />
+                    AI Trend: ₹{Math.round(predictedPriceData.predicted_price)}
+                  </span>
+                )}
+              </div>
               <input
                 type="number"
                 min="0"
@@ -333,6 +371,42 @@ export const ProductManagementModal = ({ isOpen, onClose, initialMode = 'add', t
               />
             </div>
           </div>
+
+          {/* AI PRICE SUGGESTION PANEL */}
+          {loadingPrediction ? (
+            <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl flex items-center gap-2 text-xs text-purple-700 animate-pulse">
+              <Sparkles className="w-4 h-4 animate-spin text-purple-600" />
+              <span>Analyzing market trends & computing AI price recommendation...</span>
+            </div>
+          ) : predictedPriceData?.predicted_price ? (
+            <div className="p-3.5 bg-gradient-to-r from-purple-50 via-indigo-50 to-emerald-50 border border-purple-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5 text-xs font-extrabold text-purple-900">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                  Suggested price based on market trends:
+                  <span className="text-sm font-black text-purple-700">
+                    ₹{Math.round(predictedPriceData.predicted_price)}
+                  </span>
+                  <span className="text-xs text-slate-500 font-normal">
+                    per {selectedProductObj?.unit || 'Kg'}
+                  </span>
+                </div>
+                {predictedPriceData?.current_price && (
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    Last known market price: ₹{Math.round(predictedPriceData.current_price)} • ML Model: XGBoost Lag Features
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setAskingPrice(String(Math.round(predictedPriceData.predicted_price)))}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer self-start sm:self-auto transition-all"
+              >
+                <Check className="w-3.5 h-3.5" />
+                Use this price
+              </button>
+            </div>
+          ) : null}
 
           {/* INLINE LIVE MANDI PRICE DISCOVERY CHART WIDGET */}
           <div className="p-5 bg-slate-900 text-white rounded-2xl space-y-4 shadow-xl">

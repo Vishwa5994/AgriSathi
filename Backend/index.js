@@ -17,6 +17,7 @@ const notificationsRouter = require("./routes/notifications.route");
 const reviewsRouter = require("./routes/reviews.route");
 const deliveryRouter = require("./routes/delivery.route");
 const dashboardRouter = require("./routes/dashboard.route");
+const chatRouter = require("./routes/chat.route");
 const errorHandler = require("./middleware/error.middleware");
 const rateLimiterMiddleware = require("./middleware/rateLimiter");
 
@@ -66,6 +67,7 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/reviews", reviewsRouter);
 app.use("/api/delivery", deliveryRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/chat", chatRouter);
 
 // Health Check Endpoint
 app.get("/api/health", (req, res) => {

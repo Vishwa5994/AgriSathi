@@ -29,6 +29,21 @@ function authMiddleware(req, res, next) {
     }
 }
 
+function optionalAuthMiddleware(req, res, next) {
+    try {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            const token = authHeader.split(" ")[1];
+            const secret = process.env.JWT_SECRET || process.env.secret || "super_secret_sih_farmer_market_key_2026";
+            const decoded = jwt.verify(token, secret);
+            req.user = decoded;
+        }
+    } catch (err) {
+        // Silently continue without authenticated user context
+    }
+    next();
+}
+
 function authorizeRoles(...allowedRoles) {
     return (req, res, next) => {
         if (!req.user || !allowedRoles.includes(req.user.role)) {
@@ -41,4 +56,5 @@ function authorizeRoles(...allowedRoles) {
     };
 }
 
-module.exports = { authMiddleware, authorizeRoles };
+module.exports = { authMiddleware, optionalAuthMiddleware, authorizeRoles };
+
