@@ -2,70 +2,67 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { useOrders } from '../hooks/useOrders';
+import { dashboardApi } from '../api/dashboardApi';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { StatCounter } from '../components/StatCounter';
-import { StepperProgress } from '../components/StepperProgress';
 import { SkeletonLoader } from '../components/SkeletonLoader';
-import { formatCurrency, formatDate } from '../utils/formatCurrency';
+import { formatCurrency } from '../utils/formatCurrency';
 import {
   ShoppingBag,
   MapPin,
   Clock,
   CheckCircle2,
   TrendingDown,
-  QrCode,
-  ArrowRight,
-  BarChart3,
-  Store,
-  Package,
-  Sparkles,
   UserCheck,
   Search,
-  Star,
-  Building2,
-  ReceiptText,
+  Package,
   ShoppingCart,
-  IndianRupee
+  IndianRupee,
+  RefreshCw,
+  BadgeCheck,
+  Tag
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const BuyerDashboard = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
-  const { orders, loading: loadingOrders } = useOrders();
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Filter buyer's own orders
-  const buyerOrders = user?.user_id
-    ? orders.filter((o) => Number(o.buyer_id) === Number(user.user_id) || o.buyer_name === user?.name)
-    : orders;
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await dashboardApi.getBuyerDashboard(user?.user_id);
+      setDashboardData(data);
+    } catch (err) {
+      console.error('Failed to load buyer dashboard statistics:', err);
+      setError(err.message || 'Failed to load dashboard data');
+      toast.error('Unable to fetch latest buyer dashboard data.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // --- Metrics (mirrors FarmerDashboard stat calculation) ---
-  const activeOrdersCount = buyerOrders.filter(
-    (o) =>
-      o.payment?.payment_status === 'PENDING' ||
-      o.payment?.payment_status === 'CLAIMED' ||
-      o.status === 'PENDING' ||
-      o.status === 'PENDING_CONFIRMATION'
-  ).length;
+  useEffect(() => {
+    fetchDashboardData();
+  }, [user?.user_id]);
 
-  const completedOrdersCount = buyerOrders.filter(
-    (o) =>
-      o.payment?.payment_status === 'PAID' ||
-      o.status === 'CONFIRMED' ||
-      o.status === 'COMPLETED'
-  ).length;
-
-  const totalSpent = buyerOrders
-    .filter((o) => o.payment?.payment_status === 'PAID')
-    .reduce((sum, o) => sum + (o.total_amount || 0), 0);
-
-  // Mandi savings percentage (static demo value, can be wired to real data)
-  const mandiSavingsPct = '12.3';
-
-  const recentOrders = buyerOrders.slice(0, 3);
+  // Aggregated values from real database endpoint
+  const activeOrdersCount = dashboardData?.pending_orders ?? 0;
+  const completedOrdersCount = dashboardData?.completed_orders ?? 0;
+  const totalOrdersPlaced = dashboardData?.total_orders_placed ?? 0;
+  const totalSpent = dashboardData?.total_spent ?? 0;
+  const totalOffersMade = dashboardData?.total_offers_made ?? 0;
+  const acceptedOffers = dashboardData?.accepted_offers ?? 0;
+  const pendingPayments = dashboardData?.pending_payments ?? 0;
+  const paymentsMade = dashboardData?.payments_made ?? 0;
+  const recentOrders = dashboardData?.recent_orders || [];
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
@@ -91,100 +88,138 @@ export const BuyerDashboard = () => {
             <span>•</span>
             <span className="flex items-center gap-1">
               <MapPin className="w-3 h-3 text-indigo-300" />
-              {user?.profile?.district || 'Mumbai'}, {user?.profile?.state || 'Maharashtra'}
+              {user?.profile?.city || user?.profile?.district || 'Mumbai'}, {user?.profile?.state || 'Maharashtra'}
             </span>
-            {user?.profile?.gst_number && (
-              <>
-                <span>•</span>
-                <span>GST: <strong className="text-indigo-300 font-bold">{user.profile.gst_number}</strong></span>
-              </>
-            )}
           </p>
         </div>
 
-        {/* Right: greeting badge */}
+        {/* Right: greeting badge & sync action */}
         <div className="relative z-10 flex items-center gap-3 shrink-0">
-          <div className="hidden sm:flex items-center gap-2 bg-white/10 border border-white/20 px-4 py-2.5 rounded-2xl backdrop-blur-sm">
-            <UserCheck className="w-4 h-4 text-indigo-300" />
-            <div>
-              <p className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider">Verified</p>
-              <p className="text-xs font-black text-white">{t('sourcing_farmgate')}</p>
-            </div>
-          </div>
+          <button
+            onClick={fetchDashboardData}
+            className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Sync Real Data
+          </button>
         </div>
       </div>
+
+      {/* ERROR / RETRY NOTIFICATION */}
+      {error && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between gap-3 text-rose-800 text-sm">
+          <span>Failed to load live database metrics: {error}</span>
+          <Button variant="outline" size="sm" onClick={fetchDashboardData} className="border-rose-300 text-rose-800">
+            Retry
+          </Button>
+        </div>
+      )}
 
       {/* ── 2. STAT CARDS (mirrors FarmerDashboard 4-card grid) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
 
         {/* Card 1: Active Orders */}
         <Card className="bg-white border-slate-200/90 shadow-sm hover:shadow-md transition-shadow p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Active Orders
+          {loading ? (
+            <SkeletonLoader type="card" count={1} />
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Active Orders
+                  </p>
+                  <p className="text-3xl font-black text-slate-900 mt-1">
+                    <StatCounter value={activeOrdersCount} />
+                  </p>
+                </div>
+                <div className="w-11 h-11 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                  <ShoppingCart className="w-5 h-5" />
+                </div>
+              </div>
+              <p className="text-xs text-indigo-700 font-semibold mt-3">
+                {totalOrdersPlaced} Total Orders Placed
               </p>
-              <p className="text-3xl font-black text-slate-900 mt-1">
-                <StatCounter value={activeOrdersCount} />
-              </p>
-            </div>
-            <div className="w-11 h-11 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
-              <ShoppingCart className="w-5 h-5" />
-            </div>
-          </div>
-          <p className="text-xs text-indigo-700 font-semibold mt-3">Pending / In-Progress</p>
+            </>
+          )}
         </Card>
 
-        {/* Card 2: Pending Payment */}
+        {/* Card 2: Offers Accepted */}
         <Card className="bg-white border-slate-200/90 shadow-sm hover:shadow-md transition-shadow p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Awaiting Confirmation
+          {loading ? (
+            <SkeletonLoader type="card" count={1} />
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Offers Accepted
+                  </p>
+                  <p className="text-3xl font-black text-amber-600 mt-1">
+                    <StatCounter value={acceptedOffers} />
+                  </p>
+                </div>
+                <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <Tag className="w-5 h-5" />
+                </div>
+              </div>
+              <p className="text-xs text-amber-700 font-semibold mt-3">
+                {totalOffersMade} Total Direct Offers Sent
               </p>
-              <p className="text-3xl font-black text-amber-600 mt-1">
-                <StatCounter value={buyerOrders.filter(o => o.payment?.payment_status === 'CLAIMED').length} />
-              </p>
-            </div>
-            <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-          <p className="text-xs text-amber-700 font-semibold mt-3">Payment claimed, farmer verifying</p>
+            </>
+          )}
         </Card>
 
-        {/* Card 3: Total Spent (mirrors farmer's total earnings) */}
+        {/* Card 3: Total Spent */}
         <Card className="bg-white border-slate-200/90 shadow-sm hover:shadow-md transition-shadow p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Total Direct Spend
+          {loading ? (
+            <SkeletonLoader type="card" count={1} />
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Total Direct Spend
+                  </p>
+                  <p className="text-3xl font-black text-indigo-700 mt-1">
+                    {formatCurrency(totalSpent, true)}
+                  </p>
+                </div>
+                <div className="w-11 h-11 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                  <IndianRupee className="w-5 h-5" />
+                </div>
+              </div>
+              <p className="text-xs text-indigo-700 font-semibold mt-3">
+                {completedOrdersCount} Completed Farmgate Orders
               </p>
-              <p className="text-3xl font-black text-indigo-700 mt-1">
-                {formatCurrency(totalSpent, true)}
-              </p>
-            </div>
-            <div className="w-11 h-11 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
-              <IndianRupee className="w-5 h-5" />
-            </div>
-          </div>
-          <p className="text-xs text-indigo-700 font-semibold mt-3">Direct to farmer, no middlemen</p>
+            </>
+          )}
         </Card>
 
-        {/* Card 4: Mandi Savings (mirrors farmer's mandi price advantage) */}
+        {/* Card 4: Payments / Escrow */}
         <Card className="bg-white border-slate-200/90 shadow-sm hover:shadow-md transition-shadow p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Mandi Cost Savings
+          {loading ? (
+            <SkeletonLoader type="card" count={1} />
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Settled Payments
+                  </p>
+                  <p className="text-2xl font-black text-teal-700 mt-1">
+                    {formatCurrency(paymentsMade, true)}
+                  </p>
+                </div>
+                <div className="w-11 h-11 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center">
+                  <BadgeCheck className="w-5 h-5" />
+                </div>
+              </div>
+              <p className="text-xs text-teal-700 font-semibold mt-3">
+                {pendingPayments > 0 ? `₹${pendingPayments.toLocaleString('en-IN')} pending settlement` : 'Direct UPI & Bank Settled'}
               </p>
-              <p className="text-3xl font-black text-teal-600 mt-1">-{mandiSavingsPct}%</p>
-            </div>
-            <div className="w-11 h-11 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center">
-              <TrendingDown className="w-5 h-5" />
-            </div>
-          </div>
-          <p className="text-xs text-teal-700 font-semibold mt-3">Vs. APMC wholesale price</p>
+            </>
+          )}
         </Card>
       </div>
 
@@ -211,7 +246,7 @@ export const BuyerDashboard = () => {
             </Button>
           </div>
 
-          {loadingOrders ? (
+          {loading ? (
             <SkeletonLoader type="card" count={2} />
           ) : recentOrders.length === 0 ? (
             <div className="py-10 flex flex-col items-center gap-3 text-slate-400">
@@ -231,9 +266,6 @@ export const BuyerDashboard = () => {
                   ord.payment?.payment_status === 'PAID' ||
                   ord.status === 'CONFIRMED' ||
                   ord.status === 'COMPLETED';
-                const isPending =
-                  ord.payment?.payment_status === 'PENDING' ||
-                  ord.status === 'PENDING';
 
                 return (
                   <div
@@ -248,7 +280,7 @@ export const BuyerDashboard = () => {
                   >
                     <div className="space-y-1">
                       <p className="text-sm font-black text-slate-900">
-                        Order #{ord.order_id} • {ord.quantity} {ord.unit || ord.product?.unit || 'Kg'} {t(ord.product_name || ord.product?.product_name || 'Produce')}
+                        Order #{ord.order_id} • {ord.quantity} {ord.unit || 'Kg'} {t(ord.product_name || 'Produce')}
                       </p>
                       <p className="text-xs text-slate-500 font-medium">
                         Farmer: {ord.farmer_name} • Total: ₹{ord.total_amount?.toLocaleString('en-IN')}

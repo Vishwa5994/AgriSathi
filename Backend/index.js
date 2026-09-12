@@ -16,6 +16,7 @@ const buyerOffersRouter = require("./routes/buyerOffers.route");
 const notificationsRouter = require("./routes/notifications.route");
 const reviewsRouter = require("./routes/reviews.route");
 const deliveryRouter = require("./routes/delivery.route");
+const dashboardRouter = require("./routes/dashboard.route");
 const errorHandler = require("./middleware/error.middleware");
 const rateLimiterMiddleware = require("./middleware/rateLimiter");
 
@@ -64,6 +65,7 @@ app.use("/api/buyer-offers", buyerOffersRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/reviews", reviewsRouter);
 app.use("/api/delivery", deliveryRouter);
+app.use("/api/dashboard", dashboardRouter);
 
 // Health Check Endpoint
 app.get("/api/health", (req, res) => {
