@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { productsApi } from '../api/productsApi';
 import { priceHistoryApi } from '../api/priceHistoryApi';
 import { listingsApi } from '../api/listingsApi';
+import { askOpenRouter } from '../api/openRouterApi';
 import {
   MessageCircle,
   X,
@@ -445,7 +446,7 @@ export const ChatAssistant = () => {
     synthRef.current.speak(utterance);
   }, [voiceEnabled]);
 
-  const handleSend = useCallback((overrideText) => {
+  const handleSend = useCallback(async (overrideText) => {
     const text = (overrideText ?? input).trim();
     if (!text) return;
 
@@ -454,16 +455,42 @@ export const ChatAssistant = () => {
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI thinking delay
-    const delay = 600 + Math.random() * 600;
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+    const hasOpenRouterKey = apiKey && apiKey !== 'YOUR_OPENROUTER_API_KEY_HERE';
+
+    if (hasOpenRouterKey) {
+      try {
+        const historyForOpenRouter = messages.slice(-6).map(m => ({
+          role: m.from === 'user' ? 'user' : 'assistant',
+          content: m.text
+        }));
+        historyForOpenRouter.push({ role: 'user', content: text });
+
+        const openRouterReply = await askOpenRouter(
+          historyForOpenRouter,
+          'google/gemini-2.5-flash',
+          `You are AgriSathi AI assistant. Help farmers and buyers in India with APMC mandi prices, agricultural tips, crop sales, and trading. Current user role: ${role || 'FARMER'}. User name: ${user?.name || 'User'}. Keep replies informative, concise, and helpful with emojis.`
+        );
+
+        const botMsg = { id: Date.now() + 1, from: 'bot', text: openRouterReply, time: new Date() };
+        setMessages(prev => [...prev, botMsg]);
+        setIsTyping(false);
+        speakText(openRouterReply);
+        return;
+      } catch (err) {
+        console.warn('OpenRouter API call failed, falling back to local brain:', err);
+      }
+    }
+
+    // Fallback to local rule-based smart brain
     setTimeout(() => {
       const responseText = generateResponse(text, role, user);
       const botMsg = { id: Date.now() + 1, from: 'bot', text: responseText, time: new Date() };
       setMessages(prev => [...prev, botMsg]);
       setIsTyping(false);
       speakText(responseText);
-    }, delay);
-  }, [input, role, user, speakText]);
+    }, 600);
+  }, [input, messages, role, user, speakText]);
 
   const handleVoice = () => {
     if (!recognitionRef.current) {
