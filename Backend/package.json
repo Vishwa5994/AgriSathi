@@ -1,0 +1,29 @@
+{
+  "name": "farmer_market_linkage",
+  "version": "1.0.0",
+  "description": "Farmer-to-Buyer Direct Market Linkage and Price Discovery Platform for SIH",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [
+    "sih",
+    "farmer",
+    "market-linkage",
+    "express",
+    "mysql"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.9.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
