@@ -35,11 +35,8 @@ export const Signup = () => {
   const [searchParams] = useSearchParams();
   const initialRole = (searchParams.get('role') || 'FARMER').toUpperCase();
   const [selectedRole, setSelectedRole] = useState(initialRole === 'BUYER' ? 'BUYER' : 'FARMER');
-  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [isProfileCompletionOpen, setIsProfileCompletionOpen] = useState(false);
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
-  const [customGoogleName, setCustomGoogleName] = useState('');
 
   const { signup, loginWithGoogle, loading } = useAuth();
   const { t } = useLanguage();
@@ -77,17 +74,22 @@ export const Signup = () => {
 
   const handleGoogleRedirect = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '912210135-61me4mb0jupt8v1kkrvij3be06atlj88.apps.googleusercontent.com';
-    const redirectUri = window.location.origin + window.location.pathname;
+    const redirectUri = `${window.location.origin}/signup`;
     const state = encodeURIComponent(JSON.stringify({ role: selectedRole }));
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile&state=${state}`;
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile&state=${state}&prompt=select_account`;
     window.location.href = googleAuthUrl;
   };
 
   // Automated Google OAuth Redirect Callback Handler
   React.useEffect(() => {
     const hashOrQuery = window.location.hash || window.location.search;
-    if (hashOrQuery && (hashOrQuery.includes('access_token') || hashOrQuery.includes('id_token'))) {
+    if (hashOrQuery && (hashOrQuery.includes('access_token') || hashOrQuery.includes('id_token') || hashOrQuery.includes('error='))) {
       const params = new URLSearchParams(hashOrQuery.replace('#', '?'));
+      const error = params.get('error');
+      if (error) {
+        window.history.replaceState(null, null, window.location.pathname);
+        return;
+      }
       const accessToken = params.get('access_token');
       const stateRaw = params.get('state');
       let role = selectedRole;
@@ -115,28 +117,15 @@ export const Signup = () => {
                 picture: googleUser.picture
               });
               setIsProfileCompletionOpen(true);
-            } else {
-              setIsGoogleModalOpen(true);
             }
           })
-          .catch(async () => {
+          .catch((err) => {
+            console.error('Google userinfo fetch failed:', err);
             window.history.replaceState(null, null, window.location.pathname);
-            setIsGoogleModalOpen(true);
           });
       }
     }
   }, [navigate]);
-
-  const handleGoogleSubmit = (accountData) => {
-    setIsGoogleModalOpen(false);
-    setPendingGoogleUser({
-      email: accountData.email || 'jayvekariya1107@gmail.com',
-      name: accountData.name || 'Jay Vekariya',
-      role: selectedRole,
-      picture: accountData.picture
-    });
-    setIsProfileCompletionOpen(true);
-  };
 
   const handleCompleteGoogleProfile = async (fullUserData) => {
     try {
@@ -236,17 +225,6 @@ export const Signup = () => {
               <GoogleIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
               <span>Sign up with Google</span>
             </button>
-
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 px-1">
-              <span>Redirects to Google Sign-In</span>
-              <button
-                type="button"
-                onClick={() => setIsGoogleModalOpen(true)}
-                className="text-emerald-700 hover:underline cursor-pointer"
-              >
-                Demo Google Accounts
-              </button>
-            </div>
 
             <div className="relative flex py-2 items-center">
               <div className="flex-grow border-t border-slate-200"></div>
@@ -463,115 +441,7 @@ export const Signup = () => {
         </Card>
       </div>
 
-      {/* Google Authentication Accounts Modal */}
-      <AnimatePresence>
-        {isGoogleModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden"
-            >
-              {/* Modal Header */}
-              <div className="p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md">
-                    <GoogleIcon className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black tracking-tight text-white flex items-center gap-1.5">
-                      Sign up with Google
-                    </h3>
-                    <p className="text-xs text-slate-300">
-                      Register as {selectedRole === 'FARMER' ? 'Farmer' : 'Buyer'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsGoogleModalOpen(false)}
-                  className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="p-6 space-y-4">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Select a Google Account:
-                </p>
-
-                {/* Preset Accounts */}
-                <div className="space-y-2.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleGoogleSubmit({
-                        name: 'Neel Yadav',
-                        email: 'neelyadav6131@gmail.com'
-                      })
-                    }
-                    className="w-full p-3.5 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 rounded-2xl transition-all flex items-center justify-between group cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-700 text-amber-300 font-black flex items-center justify-center shadow-xs text-sm">
-                        NY
-                      </div>
-                      <div>
-                        <p className="text-sm font-extrabold text-slate-900 group-hover:text-emerald-950">
-                          Neel Yadav
-                        </p>
-                        <p className="text-xs text-slate-600 font-mono">neelyadav6131@gmail.com</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-extrabold bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-full uppercase">
-                      Google User
-                    </span>
-                  </button>
-                </div>
-
-                {/* Custom Google Account Section */}
-                <div className="pt-3 border-t border-slate-100 space-y-3">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Or sign up with custom Google details:
-                  </p>
-                  <div className="space-y-2.5">
-                    <input
-                      type="text"
-                      placeholder="Your Full Name"
-                      value={customGoogleName}
-                      onChange={(e) => setCustomGoogleName(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                    <input
-                      type="email"
-                      placeholder="user@gmail.com"
-                      value={customGoogleEmail}
-                      onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                    <Button
-                      type="button"
-                      variant="primary"
-                      fullWidth
-                      disabled={!customGoogleEmail}
-                      onClick={() =>
-                        handleGoogleSubmit({
-                          name: customGoogleName || 'Google User',
-                          email: customGoogleEmail
-                        })
-                      }
-                      size="md"
-                    >
-                      Continue with Custom Google Account
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Google Profile Completion Modal */}
       <GoogleProfileCompletionModal

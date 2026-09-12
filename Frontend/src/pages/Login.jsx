@@ -42,13 +42,8 @@ export const Login = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [errorMsg, setErrorMsg] = useState('');
-  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [isProfileCompletionOpen, setIsProfileCompletionOpen] = useState(false);
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
-  const [customGoogleName, setCustomGoogleName] = useState('');
-  const [customGoogleRole, setCustomGoogleRole] = useState('FARMER');
-  const [selectedPresetAccount, setSelectedPresetAccount] = useState(null);
 
   const {
     register,
@@ -98,8 +93,8 @@ export const Login = () => {
         navigateBasedOnRole(user.role);
       } else {
         setPendingGoogleUser({
-          email: googleUserData.email || 'jayvekariya1107@gmail.com',
-          name: googleUserData.name || 'Jay Vekariya',
+          email: googleUserData.email || '',
+          name: googleUserData.name || 'Google User',
           role: googleUserData.role || 'FARMER',
           picture: googleUserData.picture
         });
@@ -113,8 +108,14 @@ export const Login = () => {
   // Automated Google OAuth Redirect Callback Handler
   React.useEffect(() => {
     const hashOrQuery = window.location.hash || window.location.search;
-    if (hashOrQuery && (hashOrQuery.includes('access_token') || hashOrQuery.includes('id_token'))) {
+    if (hashOrQuery && (hashOrQuery.includes('access_token') || hashOrQuery.includes('id_token') || hashOrQuery.includes('error='))) {
       const params = new URLSearchParams(hashOrQuery.replace('#', '?'));
+      const error = params.get('error');
+      if (error) {
+        window.history.replaceState(null, null, window.location.pathname);
+        setErrorMsg('Google sign in was cancelled or denied.');
+        return;
+      }
       const accessToken = params.get('access_token');
       const stateRaw = params.get('state');
       let role = 'FARMER';
@@ -142,12 +143,13 @@ export const Login = () => {
                 picture: googleUser.picture
               });
             } else {
-              setIsGoogleModalOpen(true);
+              setErrorMsg('Unable to retrieve email from Google account.');
             }
           })
-          .catch(async () => {
+          .catch(async (err) => {
+            console.error('Google userinfo error:', err);
             window.history.replaceState(null, null, window.location.pathname);
-            setIsGoogleModalOpen(true);
+            setErrorMsg('Failed to complete Google authentication.');
           });
       }
     }
@@ -186,21 +188,10 @@ export const Login = () => {
   const handleGoogleRedirect = (role = 'FARMER') => {
     setErrorMsg('');
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '912210135-61me4mb0jupt8v1kkrvij3be06atlj88.apps.googleusercontent.com';
-    const redirectUri = window.location.origin + window.location.pathname;
+    const redirectUri = `${window.location.origin}/login`;
     const state = encodeURIComponent(JSON.stringify({ role }));
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile&state=${state}`;
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile&state=${state}&prompt=select_account`;
     window.location.href = googleAuthUrl;
-  };
-
-  const handleGoogleSignInSubmit = (accountData) => {
-    setIsGoogleModalOpen(false);
-    checkAndProceedGoogleLogin({
-      email: accountData.email || 'jayvekariya1107@gmail.com',
-      name: accountData.name || 'Jay Vekariya',
-      role: accountData.role || 'FARMER',
-      picture: accountData.picture,
-      isPresetDemo: accountData.isPresetDemo
-    });
   };
 
   return (
@@ -237,17 +228,6 @@ export const Login = () => {
               <GoogleIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
               <span>Log in with Google</span>
             </button>
-
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 px-1">
-              <span>Redirects to Google Sign-In</span>
-              <button
-                type="button"
-                onClick={() => setIsGoogleModalOpen(true)}
-                className="text-emerald-700 hover:underline cursor-pointer"
-              >
-                Demo Google Accounts
-              </button>
-            </div>
 
             <div className="relative flex py-2 items-center">
               <div className="flex-grow border-t border-slate-200"></div>
@@ -319,200 +299,6 @@ export const Login = () => {
           </div>
         </Card>
       </div>
-
-      {/* Google Authentication Accounts Modal */}
-      <AnimatePresence>
-        {isGoogleModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden"
-            >
-              {/* Modal Header */}
-              <div className="p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md">
-                    <GoogleIcon className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black tracking-tight text-white flex items-center gap-1.5">
-                      Sign in with Google
-                    </h3>
-                    <p className="text-xs text-slate-300">Choose Google account for Agriसाथी</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsGoogleModalOpen(false)}
-                  className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Select a Google Account:
-                </p>
-
-                {/* Preset Accounts */}
-                <div className="space-y-2.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPresetAccount('neel');
-                      handleGoogleSignInSubmit({
-                        name: 'Neel Yadav',
-                        email: 'neelyadav6131@gmail.com',
-                        role: 'FARMER',
-                        isPresetDemo: true
-                      });
-                    }}
-                    className="w-full p-3.5 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 rounded-2xl transition-all flex items-center justify-between group cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-700 text-amber-300 font-black flex items-center justify-center shadow-xs text-sm">
-                        NY
-                      </div>
-                      <div>
-                        <p className="text-sm font-extrabold text-slate-900 group-hover:text-emerald-950">
-                          Neel Yadav
-                        </p>
-                        <p className="text-xs text-slate-600 font-mono">neelyadav6131@gmail.com</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-extrabold bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-full uppercase">
-                      Google User
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPresetAccount('farmer');
-                      handleGoogleSignInSubmit({
-                        name: 'Ramesh Patel',
-                        email: 'ramesh.farmer@agrimarket.in',
-                        role: 'FARMER',
-                        isPresetDemo: true,
-                        picture: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-                      });
-                    }}
-                    className="w-full p-3.5 bg-slate-50 hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 rounded-2xl transition-all flex items-center justify-between group cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shadow-xs text-sm">
-                        RP
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800 group-hover:text-emerald-900">
-                          Ramesh Patel
-                        </p>
-                        <p className="text-xs text-slate-500">ramesh.farmer@agrimarket.in</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full uppercase">
-                      Farmer
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPresetAccount('buyer');
-                      handleGoogleSignInSubmit({
-                        name: 'Vikram Malhotra',
-                        email: 'vikram@freshmandi.com',
-                        role: 'BUYER',
-                        isPresetDemo: true,
-                        picture: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
-                      });
-                    }}
-                    className="w-full p-3.5 bg-slate-50 hover:bg-indigo-50/80 border border-slate-200 hover:border-indigo-300 rounded-2xl transition-all flex items-center justify-between group cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center shadow-xs text-sm">
-                        VM
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800 group-hover:text-indigo-900">
-                          Vikram Malhotra
-                        </p>
-                        <p className="text-xs text-slate-500">vikram@freshmandi.com</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-full uppercase">
-                      Buyer
-                    </span>
-                  </button>
-                </div>
-
-                {/* Custom Google Account Section */}
-                <div className="pt-3 border-t border-slate-100 space-y-3">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Or sign in with custom Google details:
-                  </p>
-                  <div className="space-y-2.5">
-                    <input
-                      type="text"
-                      placeholder="Your Full Name"
-                      value={customGoogleName}
-                      onChange={(e) => setCustomGoogleName(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                    <input
-                      type="email"
-                      placeholder="user@gmail.com"
-                      value={customGoogleEmail}
-                      onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCustomGoogleRole('FARMER')}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${customGoogleRole === 'FARMER'
-                            ? 'bg-emerald-600 text-white border-emerald-600'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}
-                      >
-                        Farmer Account
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCustomGoogleRole('BUYER')}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${customGoogleRole === 'BUYER'
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}
-                      >
-                        Buyer Account
-                      </button>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      fullWidth
-                      disabled={!customGoogleEmail}
-                      onClick={() =>
-                        handleGoogleSignInSubmit({
-                          name: customGoogleName || 'Google User',
-                          email: customGoogleEmail,
-                          role: customGoogleRole
-                        })
-                      }
-                      size="md"
-                    >
-                      Continue with Custom Google Account
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Google Profile Completion Modal */}
       <GoogleProfileCompletionModal
