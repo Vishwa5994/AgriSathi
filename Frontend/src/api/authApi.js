@@ -41,9 +41,13 @@ export const authApi = {
   },
 
   loginWithGoogle: async (googleData) => {
-    const response = await apiClient.post('/auth/login', {
+    const response = await apiClient.post('/auth/google', {
       email: googleData.email,
-      password: googleData.password || 'GoogleOAuth2026!'
+      name: googleData.name,
+      phone: googleData.phone,
+      role: googleData.role || 'FARMER',
+      picture: googleData.picture,
+      profile: googleData.profile
     });
     const data = response.data;
     if (data.error) {

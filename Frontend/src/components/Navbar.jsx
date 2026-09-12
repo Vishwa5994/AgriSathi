@@ -21,7 +21,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const Navbar = () => {
-  const { user, isAuthenticated, role, logout, switchDemoRole } = useAuth();
+  const { user, isAuthenticated, role, logout } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -278,57 +278,6 @@ export const Navbar = () => {
                       >
                         {role === 'ADMIN' ? '🛡️ APMC Master Admin' : role === 'BUYER' ? '🛒 Wholesale Buyer' : '🌾 Farmer'}
                       </span>
-                    </div>
-
-                    {/* Quick Switch Demo Role Section */}
-                    <div className="p-2 border-b border-slate-100 bg-slate-50/50 space-y-1">
-                      <p className="text-[10px] font-extrabold text-slate-400 uppercase px-2 tracking-wider">
-                        Switch Role Context
-                      </p>
-                      <div className="grid grid-cols-3 gap-1">
-                        <button
-                          onClick={() => {
-                            setProfileDropdownOpen(false);
-                            switchDemoRole('FARMER');
-                            navigate('/farmer-dashboard');
-                          }}
-                          className={`px-1.5 py-1 text-[10px] font-bold rounded-lg transition-all text-center ${
-                            role === 'FARMER'
-                              ? 'bg-emerald-600 text-white shadow-2xs'
-                              : 'bg-white hover:bg-emerald-50 text-slate-700 border border-slate-200'
-                          }`}
-                        >
-                          🌾 Farmer
-                        </button>
-                        <button
-                          onClick={() => {
-                            setProfileDropdownOpen(false);
-                            switchDemoRole('BUYER');
-                            navigate('/buyer-dashboard');
-                          }}
-                          className={`px-1.5 py-1 text-[10px] font-bold rounded-lg transition-all text-center ${
-                            role === 'BUYER'
-                              ? 'bg-amber-600 text-white shadow-2xs'
-                              : 'bg-white hover:bg-amber-50 text-slate-700 border border-slate-200'
-                          }`}
-                        >
-                          🛒 Buyer
-                        </button>
-                        <button
-                          onClick={() => {
-                            setProfileDropdownOpen(false);
-                            switchDemoRole('ADMIN');
-                            navigate('/admin-dashboard');
-                          }}
-                          className={`px-1.5 py-1 text-[10px] font-bold rounded-lg transition-all text-center ${
-                            role === 'ADMIN'
-                              ? 'bg-purple-700 text-white shadow-2xs'
-                              : 'bg-white hover:bg-purple-50 text-slate-700 border border-slate-200'
-                          }`}
-                        >
-                          🛡️ Admin
-                        </button>
-                      </div>
                     </div>
 
                     <button

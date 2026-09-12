@@ -40,13 +40,29 @@ async function getByOrderId(orderId) {
     }
 }
 
+function formatDateForDb(d) {
+    if (!d) return null;
+    const dateObj = d instanceof Date ? d : new Date(d);
+    if (isNaN(dateObj.getTime())) return null;
+    return dateObj.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 async function insert(paymentData, client = db) {
     try {
+        let payment_id = paymentData.payment_id;
+        if (!payment_id) {
+            const [maxRes] = await client.query("SELECT COALESCE(MAX(payment_id), 0) + 1 AS nextId FROM payments");
+            payment_id = maxRes[0].nextId;
+        }
         const { order_id, amount, payment_method, payment_status, transaction_id, paid_at } = paymentData;
+        const formattedPaidAt = formatDateForDb(paid_at);
         const [result] = await client.query(
-            "INSERT INTO payments (order_id, amount, payment_method, payment_status, transaction_id, paid_at) VALUES (?, ?, ?, ?, ?, ?)",
-            [order_id, amount, payment_method, payment_status || 'PENDING', transaction_id || null, paid_at || null]
+            "INSERT INTO payments (payment_id, order_id, amount, payment_method, payment_status, transaction_id, paid_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [payment_id, order_id, amount, payment_method, payment_status || 'PENDING', transaction_id || null, formattedPaidAt]
         );
+        if (!result.insertId) {
+            result.insertId = payment_id;
+        }
         return result;
     } catch (err) {
         console.error("payments.model insert error:", err);
@@ -57,9 +73,10 @@ async function insert(paymentData, client = db) {
 async function update(id, paymentData) {
     try {
         const { amount, payment_method, payment_status, transaction_id, paid_at } = paymentData;
+        const formattedPaidAt = formatDateForDb(paid_at);
         const [result] = await db.query(
             "UPDATE payments SET amount = ?, payment_method = ?, payment_status = ?, transaction_id = ?, paid_at = ? WHERE payment_id = ?",
-            [amount, payment_method, payment_status, transaction_id || null, paid_at || null, id]
+            [amount, payment_method, payment_status, transaction_id || null, formattedPaidAt, id]
         );
         return result;
     } catch (err) {
@@ -70,7 +87,7 @@ async function update(id, paymentData) {
 
 async function updateStatus(id, payment_status, transaction_id = null, client = db) {
     try {
-        const paidAt = payment_status === 'PAID' ? new Date() : null;
+        const paidAt = payment_status === 'PAID' ? formatDateForDb(new Date()) : null;
         const [result] = await client.query(
             "UPDATE payments SET payment_status = ?, transaction_id = COALESCE(?, transaction_id), paid_at = ? WHERE payment_id = ?",
             [payment_status, transaction_id, paidAt, id]

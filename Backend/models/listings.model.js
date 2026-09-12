@@ -11,6 +11,10 @@ async function getAll(filters = {}) {
         `;
         const params = [];
 
+        if (filters.farmer_id) {
+            query += " AND l.farmer_id = ?";
+            params.push(filters.farmer_id);
+        }
         if (filters.product_id) {
             query += " AND l.product_id = ?";
             params.push(filters.product_id);
@@ -58,9 +62,10 @@ async function getById(id) {
 async function getByFarmerId(farmerId) {
     try {
         const [data] = await db.query(`
-            SELECT l.*, l.quantity as available_stock, p.product_name, p.category, p.unit, p.picture, p.picture as image_url, p.description 
+            SELECT l.*, l.quantity as available_stock, p.product_name, p.category, p.unit, p.picture, p.picture as image_url, p.description, u.name as farmer_name, u.phone as farmer_phone 
             FROM listings l
             JOIN products p ON l.product_id = p.product_id
+            JOIN users u ON l.farmer_id = u.user_id
             WHERE l.farmer_id = ?
             ORDER BY l.listing_id DESC
         `, [farmerId]);

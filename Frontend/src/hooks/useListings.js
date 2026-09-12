@@ -7,18 +7,25 @@ export const useListings = (initialFilters = {}) => {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState(initialFilters);
 
+  useEffect(() => {
+    setFilters(initialFilters);
+  }, [initialFilters.farmer_id, initialFilters.product_id, initialFilters.status]);
+
   const fetchListings = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await listingsApi.getListings(filters);
+      const farmerId = filters.farmer_id || initialFilters.farmer_id;
+      const data = farmerId
+        ? await listingsApi.getMyListings(farmerId)
+        : await listingsApi.getListings(filters);
       setListings(data || []);
     } catch (err) {
       setError(err.message || 'Failed to load listings');
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, initialFilters.farmer_id]);
 
   useEffect(() => {
     fetchListings();
@@ -30,6 +37,9 @@ export const useListings = (initialFilters = {}) => {
 
   const createListing = async (listingData, currentUser) => {
     const newListing = await listingsApi.createListing(listingData, currentUser);
+    if (newListing && newListing.listing_id) {
+      setListings((prev) => [newListing, ...prev]);
+    }
     fetchListings();
     return newListing;
   };

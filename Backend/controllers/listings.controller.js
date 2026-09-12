@@ -93,6 +93,7 @@ function formatListing(item) {
     available_stock: stock,
     picture: pic,
     image_url: pic,
+    pickup_location: item.location || item.pickup_location || '',
     product: {
       product_id: item.product_id,
       product_name: item.product_name,
@@ -105,13 +106,26 @@ function formatListing(item) {
 }
 
 async function getAllListings(req, res) {
-    const { product_id, status, location, limit, offset } = req.query;
-    const data = await listingsModel.getAll({ product_id, status, location, limit, offset });
+    const { farmer_id, product_id, status, location, limit, offset } = req.query;
+    const data = await listingsModel.getAll({ farmer_id, product_id, status, location, limit, offset });
     if (data !== false) {
         const formatted = Array.isArray(data) ? data.map(formatListing) : [];
         return res.send({ error: false, data: formatted, message: "Listings retrieved successfully" });
     }
     return res.status(500).send({ error: true, message: "Failed to retrieve listings" });
+}
+
+async function getMyListings(req, res) {
+    const farmerId = req.user?.user_id || req.user?.id;
+    if (!farmerId) {
+        return res.status(401).send({ error: true, message: "Unauthorized: Missing user payload" });
+    }
+    const data = await listingsModel.getByFarmerId(farmerId);
+    if (data !== false) {
+        const formatted = Array.isArray(data) ? data.map(formatListing) : [];
+        return res.send({ error: false, data: formatted, message: "My listings retrieved successfully" });
+    }
+    return res.status(500).send({ error: true, message: "Failed to retrieve my listings" });
 }
 
 async function getListingById(req, res) {
@@ -123,7 +137,7 @@ async function getListingById(req, res) {
 }
 
 async function getListingsByFarmer(req, res) {
-    const farmerId = req.params.farmer_id || req.user.user_id;
+    const farmerId = req.params.farmer_id || req.user?.user_id || req.user?.id;
     const data = await listingsModel.getByFarmerId(farmerId);
     if (data !== false) {
         const formatted = Array.isArray(data) ? data.map(formatListing) : [];
@@ -133,39 +147,72 @@ async function getListingsByFarmer(req, res) {
 }
 
 async function createListing(req, res) {
-    const farmer_id = req.user.role === "FARMER" ? req.user.user_id : (req.body.farmer_id || req.user.user_id);
+    const userId = req.user?.user_id || req.user?.id;
+    if (!userId) {
+        return res.status(401).send({ error: true, message: "Unauthorized: Missing authentication token or user identity" });
+    }
+
+    const userRole = (req.user?.role || '').toUpperCase();
+    const farmer_id = userRole === "FARMER" ? userId : (req.body.farmer_id || userId);
     const { product_id, quantity, price_per_unit, quality_grade, harvest_date, location, status } = req.body;
 
-    if (!product_id || !quantity || !price_per_unit || !location) {
+    const numericProductId = Number(product_id);
+    const numericQuantity = Number(quantity);
+    const numericPrice = Number(price_per_unit);
+
+    if (isNaN(numericProductId) || numericProductId <= 0) {
         return res.status(400).send({
             error: true,
-            message: "Validation Error: product_id, quantity, price_per_unit, and location are required"
+            message: "Validation Error: product_id is required and must be a valid positive number"
         });
     }
 
-    const product = await productsModel.getById(product_id);
+    if (isNaN(numericQuantity) || numericQuantity <= 0) {
+        return res.status(400).send({
+            error: true,
+            message: "Validation Error: quantity is required and must be greater than 0"
+        });
+    }
+
+    if (isNaN(numericPrice) || numericPrice <= 0) {
+        return res.status(400).send({
+            error: true,
+            message: "Validation Error: price_per_unit is required and must be greater than 0"
+        });
+    }
+
+    if (!location || String(location).trim() === '') {
+        return res.status(400).send({
+            error: true,
+            message: "Validation Error: location is required"
+        });
+    }
+
+    const product = await productsModel.getById(numericProductId);
     if (!product) {
         return res.status(404).send({
             error: true,
-            message: "Product not found. Ensure product_id exists before creating a listing."
+            message: `Product not found (ID #${numericProductId}). Please select a valid product.`
         });
     }
 
     const result = await listingsModel.insert({
         farmer_id,
-        product_id,
-        quantity,
-        price_per_unit,
-        quality_grade,
-        harvest_date,
-        location,
+        product_id: numericProductId,
+        quantity: numericQuantity,
+        price_per_unit: numericPrice,
+        quality_grade: quality_grade || 'Grade A+',
+        harvest_date: harvest_date || new Date().toISOString().split('T')[0],
+        location: String(location).trim(),
         status: status || 'AVAILABLE'
     });
 
-    if (result && result.insertId) {
+    if (result && (result.insertId || result.affectedRows >= 0)) {
+        const createdId = result.insertId || result.nextId;
+        const fresh = createdId ? await listingsModel.getById(createdId) : null;
         return res.status(201).send({
             error: false,
-            data: { listing_id: result.insertId, farmer_id, product_id, quantity, price_per_unit, location, status: status || 'AVAILABLE' },
+            data: fresh ? formatListing(fresh) : { listing_id: createdId, farmer_id, product_id: numericProductId, quantity: numericQuantity, price_per_unit: numericPrice, location, status: status || 'AVAILABLE' },
             message: "Listing created successfully"
         });
     }
@@ -179,7 +226,8 @@ async function updateListing(req, res) {
         return res.status(404).send({ error: true, message: "Listing not found" });
     }
 
-    if (req.user.role === "FARMER" && listing.farmer_id !== req.user.user_id) {
+    const userId = req.user?.user_id || req.user?.id;
+    if (req.user?.role === "FARMER" && Number(listing.farmer_id) !== Number(userId)) {
         return res.status(403).send({ error: true, message: "Forbidden: You can only update your own listings" });
     }
 
@@ -196,7 +244,7 @@ async function updateListing(req, res) {
 
     const data = await listingsModel.update(req.params.id, updatedData);
 
-    if (data && data.affectedRows > 0) {
+    if (data !== false) {
         const fresh = await listingsModel.getById(req.params.id);
         return res.send({ error: false, data: formatListing(fresh), message: "Listing updated successfully" });
     }
@@ -209,15 +257,16 @@ async function deleteListing(req, res) {
         return res.status(404).send({ error: true, message: "Listing not found" });
     }
 
-    if (req.user.role === "FARMER" && listing.farmer_id !== req.user.user_id) {
+    const userId = req.user?.user_id || req.user?.id;
+    if (req.user?.role === "FARMER" && Number(listing.farmer_id) !== Number(userId)) {
         return res.status(403).send({ error: true, message: "Forbidden: You can only delete your own listings" });
     }
 
     const data = await listingsModel.deleteById(req.params.id);
-    if (data && data.affectedRows > 0) {
+    if (data !== false) {
         return res.send({ error: false, message: "Listing deleted successfully" });
     }
     return res.status(400).send({ error: true, message: "Failed to delete listing" });
 }
 
-module.exports = { getAllListings, getListingById, getListingsByFarmer, createListing, updateListing, deleteListing };
+module.exports = { formatListing, getAllListings, getMyListings, getListingById, getListingsByFarmer, createListing, updateListing, deleteListing };

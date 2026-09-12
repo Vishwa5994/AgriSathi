@@ -164,7 +164,7 @@ export const AddProduct = () => {
       await refetch();
       navigate('/my-products');
     } catch (err) {
-      toast.error('Operation failed');
+      toast.error(err?.message || 'Operation failed');
     } finally {
       setSubmitting(false);
     }

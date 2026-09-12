@@ -14,6 +14,38 @@ export const listingsApi = {
     }
   },
 
+  getMyListings: async (farmerId) => {
+    try {
+      // Primary: use /listings/farmer/:farmer_id (always works, even on older backend deploys)
+      // Fallback: /listings/my-listings (requires deployed route, uses JWT user_id)
+      let response;
+      if (farmerId) {
+        response = await apiClient.get(`/listings/farmer/${farmerId}`);
+      } else {
+        // Try my-listings first, fall back to query param
+        try {
+          response = await apiClient.get('/listings/my-listings');
+        } catch (innerErr) {
+          // If /my-listings route doesn't exist on deployed backend, fallback
+          const storedUser = JSON.parse(localStorage.getItem('agri_user') || '{}');
+          const uid = storedUser.user_id;
+          if (uid) {
+            response = await apiClient.get(`/listings/farmer/${uid}`);
+          } else {
+            throw innerErr;
+          }
+        }
+      }
+      const res = response.data;
+      if (res.error) return [];
+      const listings = Array.isArray(res.data) ? res.data : Array.isArray(res) ? res : [];
+      return listings;
+    } catch (e) {
+      console.error('Failed to fetch my listings:', e?.response?.data || e.message);
+      return [];
+    }
+  },
+
   getListingById: async (id) => {
     try {
       const response = await apiClient.get(`/listings/${id}`);
