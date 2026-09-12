@@ -1,21 +1,31 @@
 import apiClient from './client';
-import { mockProductsApi } from './mockService';
 
 export const productsApi = {
   getProducts: async () => {
     try {
       const response = await apiClient.get('/products');
-      return response.data;
+      const res = response.data;
+      if (res.error) return [];
+      return Array.isArray(res.data) ? res.data : Array.isArray(res) ? res : [];
     } catch (e) {
-      return await mockProductsApi.getProducts();
+      console.error('Failed to fetch products:', e?.response?.data || e.message);
+      return [];
     }
   },
+
   createProduct: async (productData) => {
-    try {
-      const response = await apiClient.post('/products', productData);
-      return response.data;
-    } catch (e) {
-      return await mockProductsApi.createProduct(productData);
+    const payload = {
+      product_name: productData.product_name,
+      category: productData.category || 'General',
+      unit: productData.unit || 'KG',
+      description: productData.description || 'Fresh agricultural produce'
+    };
+
+    const response = await apiClient.post('/products', payload);
+    const res = response.data;
+    if (res.error) {
+      throw new Error(res.message || 'Failed to create product');
     }
+    return res.data || res;
   }
 };

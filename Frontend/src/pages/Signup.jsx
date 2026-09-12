@@ -76,18 +76,7 @@ export const Signup = () => {
   };
 
   const handleGoogleRedirect = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (clientId && clientId.includes('.apps.googleusercontent.com')) {
-      const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || `${window.location.origin}/login`;
-      const state = encodeURIComponent(JSON.stringify({ role: selectedRole }));
-      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-        redirectUri
-      )}&response_type=token&scope=email%20profile&prompt=select_account&state=${state}`;
-
-      window.location.href = googleAuthUrl;
-    } else {
-      setIsGoogleModalOpen(true);
-    }
+    setIsGoogleModalOpen(true);
   };
 
   const handleGoogleSubmit = (accountData) => {
@@ -466,6 +455,32 @@ export const Signup = () => {
 
                 {/* Preset Accounts */}
                 <div className="space-y-2.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleGoogleSubmit({
+                        name: 'Neel Yadav',
+                        email: 'neelyadav6131@gmail.com'
+                      })
+                    }
+                    className="w-full p-3.5 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 rounded-2xl transition-all flex items-center justify-between group cursor-pointer text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-emerald-700 text-amber-300 font-black flex items-center justify-center shadow-xs text-sm">
+                        NY
+                      </div>
+                      <div>
+                        <p className="text-sm font-extrabold text-slate-900 group-hover:text-emerald-950">
+                          Neel Yadav
+                        </p>
+                        <p className="text-xs text-slate-600 font-mono">neelyadav6131@gmail.com</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-extrabold bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-full uppercase">
+                      Google User
+                    </span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() =>

@@ -32,9 +32,10 @@ const HomeRoute = () => {
   const navigate = useNavigate();
 
   React.useEffect(() => {
-    if (window.location.hash && window.location.hash.includes('access_token')) {
-      // Forward OAuth token hash to /login route so GoogleProfileCompletionModal opens
-      navigate(`/login${window.location.hash}`, { replace: true });
+    const hashOrQuery = window.location.hash || window.location.search;
+    if (hashOrQuery && (hashOrQuery.includes('access_token') || hashOrQuery.includes('id_token'))) {
+      // Forward OAuth token hash/query to /login route so profile modal or authentication completes
+      navigate(`/login${hashOrQuery}`, { replace: true });
     }
   }, [navigate]);
 

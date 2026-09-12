@@ -397,6 +397,83 @@ export const mockOrdersApi = {
       return order;
     }
     return null;
+  },
+
+  cancelOrder: async (orderId, reason = 'Cancelled by buyer') => {
+    await new Promise((res) => setTimeout(res, 400));
+    const orders = getStored('orders', MOCK_ORDERS);
+    const order = orders.find((o) => o.order_id === orderId);
+
+    if (order) {
+      order.status = 'CANCELLED';
+      if (order.payment) {
+        order.payment.payment_status = 'CANCELLED';
+      }
+      order.cancel_reason = reason;
+      order.cancelled_at = new Date().toISOString();
+
+      // Restore stock on listing
+      const listings = getStored('listings', MOCK_LISTINGS);
+      const listing = listings.find((l) => l.listing_id === order.listing_id);
+      if (listing) {
+        listing.available_stock += order.quantity;
+        if (listing.status === 'SOLD') listing.status = 'AVAILABLE';
+        setStored('listings', listings);
+      }
+
+      setStored('orders', orders);
+
+      // Notify Farmer
+      const notifs = getStored('notifications', MOCK_NOTIFICATIONS);
+      notifs.unshift({
+        notification_id: `notif-${Date.now()}`,
+        user_id: order.farmer_id,
+        title: '🚫 Order Cancelled by Buyer',
+        message: `Order #${order.order_id} (${order.product_name}) was cancelled by buyer ${order.buyer_name}. Reason: ${reason}. Stock has been restored.`,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        type: 'ORDER_CANCELLED',
+        target_order_id: order.order_id
+      });
+      setStored('notifications', notifs);
+
+      return order;
+    }
+    return null;
+  },
+
+  returnOrder: async (orderId, returnReason, returnNote) => {
+    await new Promise((res) => setTimeout(res, 400));
+    const orders = getStored('orders', MOCK_ORDERS);
+    const order = orders.find((o) => o.order_id === orderId);
+
+    if (order) {
+      order.status = 'RETURN_REQUESTED';
+      order.return_details = {
+        reason: returnReason,
+        note: returnNote,
+        requested_at: new Date().toISOString()
+      };
+
+      setStored('orders', orders);
+
+      // Notify Farmer
+      const notifs = getStored('notifications', MOCK_NOTIFICATIONS);
+      notifs.unshift({
+        notification_id: `notif-${Date.now()}`,
+        user_id: order.farmer_id,
+        title: '↩️ Return Requested by Buyer',
+        message: `Buyer ${order.buyer_name} requested a return for Order #${order.order_id} (${order.product_name}). Reason: ${returnReason}.`,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        type: 'RETURN_REQUESTED',
+        target_order_id: order.order_id
+      });
+      setStored('notifications', notifs);
+
+      return order;
+    }
+    return null;
   }
 };
 

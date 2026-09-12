@@ -1,49 +1,65 @@
 import apiClient from './client';
-import { mockListingsApi } from './mockService';
 
 export const listingsApi = {
   getListings: async (filters = {}) => {
     try {
       const response = await apiClient.get('/listings', { params: filters });
-      return response.data;
+      const res = response.data;
+      if (res.error) return [];
+      const listings = Array.isArray(res.data) ? res.data : Array.isArray(res) ? res : [];
+      return listings;
     } catch (e) {
-      return await mockListingsApi.getListings(filters);
+      console.error('Failed to fetch listings:', e?.response?.data || e.message);
+      return [];
     }
   },
 
   getListingById: async (id) => {
     try {
       const response = await apiClient.get(`/listings/${id}`);
-      return response.data;
+      const res = response.data;
+      if (res.error) return null;
+      return res.data || res;
     } catch (e) {
-      return await mockListingsApi.getListingById(id);
+      console.error(`Failed to fetch listing #${id}:`, e?.response?.data || e.message);
+      return null;
     }
   },
 
-  createListing: async (listingData, currentUser) => {
-    try {
-      const response = await apiClient.post('/listings', listingData);
-      return response.data;
-    } catch (e) {
-      return await mockListingsApi.createListing(listingData, currentUser);
+  createListing: async (listingData) => {
+    const payload = {
+      product_id: Number(listingData.product_id),
+      quantity: Number(listingData.quantity),
+      price_per_unit: Number(listingData.price_per_unit),
+      quality_grade: listingData.quality_grade || 'Grade A+',
+      harvest_date: listingData.harvest_date || new Date().toISOString().split('T')[0],
+      location: listingData.location || listingData.pickup_location || 'APMC Yard',
+      status: listingData.status || 'AVAILABLE'
+    };
+
+    const response = await apiClient.post('/listings', payload);
+    const res = response.data;
+    if (res.error) {
+      throw new Error(res.message || 'Failed to create listing');
     }
+    return res.data || res;
   },
 
   updateListing: async (listingId, listingData) => {
-    try {
-      const response = await apiClient.put(`/listings/${listingId}`, listingData);
-      return response.data;
-    } catch (e) {
-      return await mockListingsApi.updateListing(listingId, listingData);
+    const response = await apiClient.put(`/listings/${listingId}`, listingData);
+    const res = response.data;
+    if (res.error) {
+      throw new Error(res.message || 'Failed to update listing');
     }
+    return res.data || res;
   },
 
   deleteListing: async (listingId) => {
-    try {
-      await apiClient.delete(`/listings/${listingId}`);
-      return true;
-    } catch (e) {
-      return await mockListingsApi.deleteListing(listingId);
+    const response = await apiClient.delete(`/listings/${listingId}`);
+    const res = response.data;
+    if (res.error) {
+      throw new Error(res.message || 'Failed to delete listing');
     }
+    return true;
   }
 };

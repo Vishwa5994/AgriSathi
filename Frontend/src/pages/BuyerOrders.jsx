@@ -7,7 +7,8 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { StepperProgress } from '../components/StepperProgress';
 import { SkeletonLoader } from '../components/SkeletonLoader';
-import { formatDate } from '../utils/formatCurrency';
+import { InvoiceModal } from '../components/InvoiceModal';
+import { formatDate, getReturnEligibility } from '../utils/formatCurrency';
 import {
   ShoppingBag,
   Clock,
@@ -19,8 +20,30 @@ import {
   MapPin,
   ArrowRight,
   ReceiptText,
-  PackageCheck
+  PackageCheck,
+  XCircle,
+  RotateCcw,
+  X,
+  AlertCircle,
+  FileText,
+  CalendarClock
 } from 'lucide-react';
+
+const CANCEL_REASONS = [
+  'Ordered by mistake',
+  'Found better price elsewhere',
+  'Delivery/Pickup delay expected',
+  'Farmer unresponsive',
+  'Other'
+];
+
+const RETURN_REASONS = [
+  'Quality lower than specified grade',
+  'Damaged or spoiled produce',
+  'Incorrect quantity/weight delivered',
+  'Wrong crop variety received',
+  'Other'
+];
 
 export const BuyerOrders = () => {
   const { user } = useAuth();
@@ -32,7 +55,20 @@ export const BuyerOrders = () => {
   const [statusTab, setStatusTab] = useState(initialFilter.toUpperCase());
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { orders, loading } = useOrders();
+  // Modal States
+  const [selectedOrderForCancel, setSelectedOrderForCancel] = useState(null);
+  const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
+  const [customCancelReason, setCustomCancelReason] = useState('');
+
+  const [selectedOrderForReturn, setSelectedOrderForReturn] = useState(null);
+  const [returnReason, setReturnReason] = useState(RETURN_REASONS[0]);
+  const [returnNote, setReturnNote] = useState('');
+
+  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null);
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const { orders, loading, cancelOrder, returnOrder } = useOrders();
 
   // All of this buyer's orders
   const buyerOrders = orders.filter(
@@ -41,32 +77,45 @@ export const BuyerOrders = () => {
 
   const pendingOrders = buyerOrders.filter(
     (o) =>
-      o.payment?.payment_status === 'PENDING' ||
-      o.payment?.payment_status === 'CLAIMED' ||
-      o.status === 'PENDING_CONFIRMATION' ||
-      o.status === 'PENDING'
+      (o.payment?.payment_status === 'PENDING' ||
+        o.payment?.payment_status === 'CLAIMED' ||
+        o.status === 'PENDING_CONFIRMATION' ||
+        o.status === 'PENDING') &&
+      o.status !== 'CANCELLED' &&
+      o.status !== 'RETURN_REQUESTED'
   );
 
   const completedOrders = buyerOrders.filter(
     (o) =>
-      o.payment?.payment_status === 'PAID' ||
-      o.status === 'CONFIRMED' ||
-      o.status === 'COMPLETED'
+      (o.payment?.payment_status === 'PAID' ||
+        o.status === 'CONFIRMED' ||
+        o.status === 'COMPLETED') &&
+      o.status !== 'RETURN_REQUESTED'
   );
 
+  const cancelledOrders = buyerOrders.filter((o) => o.status === 'CANCELLED');
+  const returnRequestedOrders = buyerOrders.filter((o) => o.status === 'RETURN_REQUESTED');
+
   const filteredOrders = buyerOrders.filter((ord) => {
+    const isCancelled = ord.status === 'CANCELLED';
+    const isReturnRequested = ord.status === 'RETURN_REQUESTED';
     const isClaimed =
-      ord.payment?.payment_status === 'CLAIMED' ||
-      ord.status === 'PENDING_CONFIRMATION' ||
-      ord.status === 'PENDING' ||
-      ord.payment?.payment_status === 'PENDING';
+      (ord.payment?.payment_status === 'CLAIMED' ||
+        ord.status === 'PENDING_CONFIRMATION' ||
+        ord.status === 'PENDING' ||
+        ord.payment?.payment_status === 'PENDING') &&
+      !isCancelled &&
+      !isReturnRequested;
     const isPaid =
-      ord.payment?.payment_status === 'PAID' ||
-      ord.status === 'CONFIRMED' ||
-      ord.status === 'COMPLETED';
+      (ord.payment?.payment_status === 'PAID' ||
+        ord.status === 'CONFIRMED' ||
+        ord.status === 'COMPLETED') &&
+      !isReturnRequested;
 
     if (statusTab === 'PENDING' && !isClaimed) return false;
     if (statusTab === 'COMPLETED' && !isPaid) return false;
+    if (statusTab === 'CANCELLED' && !isCancelled) return false;
+    if (statusTab === 'RETURN_REQUESTED' && !isReturnRequested) return false;
 
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
@@ -79,6 +128,35 @@ export const BuyerOrders = () => {
     }
     return true;
   });
+
+  const handleConfirmCancel = async () => {
+    if (!selectedOrderForCancel) return;
+    const reason = cancelReason === 'Other' ? customCancelReason.trim() || 'Cancelled by buyer' : cancelReason;
+    setSubmitting(true);
+    try {
+      await cancelOrder(selectedOrderForCancel.order_id, reason);
+      setSelectedOrderForCancel(null);
+      setCustomCancelReason('');
+    } catch (e) {
+      // Handled in hook toast
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmReturn = async () => {
+    if (!selectedOrderForReturn) return;
+    setSubmitting(true);
+    try {
+      await returnOrder(selectedOrderForReturn.order_id, returnReason, returnNote.trim());
+      setSelectedOrderForReturn(null);
+      setReturnNote('');
+    } catch (e) {
+      // Handled in hook toast
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
@@ -98,7 +176,7 @@ export const BuyerOrders = () => {
         </span>
       </div>
 
-      {/* Header Banner (navy/indigo theme for buyer, mirrors Farmer green banner) */}
+      {/* Header Banner */}
       <div className="bg-gradient-to-r from-[#0a0f2c] via-[#111a45] to-[#0d1538] text-white rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="absolute -top-10 -right-10 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="space-y-1 relative z-10">
@@ -107,33 +185,32 @@ export const BuyerOrders = () => {
             Buyer Order Management
           </div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-            My Purchase Orders &amp; Payment Status
+            My Purchase Orders, Invoices &amp; 7-Day Returns
           </h1>
           <p className="text-xs text-indigo-200/90 font-medium max-w-xl">
-            Track all your direct farm-gate orders, payment progress, and pickup status in one place.
+            Download official tax invoices for completed orders, request returns within the 7-day policy window, and track payment status.
           </p>
         </div>
       </div>
 
       {/* Navigation Tabs & Search Toolbar */}
       <Card className="bg-white border-slate-200/90 p-4 shadow-2xs flex flex-col gap-4">
-        {/* Filter Pills - wrappable on mobile */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-2xl flex-wrap">
             <button
               onClick={() => { setStatusTab('ALL'); setSearchParams({}); }}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                 statusTab === 'ALL'
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              All Orders ({buyerOrders.length})
+              All ({buyerOrders.length})
             </button>
 
             <button
               onClick={() => { setStatusTab('PENDING'); setSearchParams({ status: 'pending' }); }}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
                 statusTab === 'PENDING'
                   ? 'bg-amber-500 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -145,7 +222,7 @@ export const BuyerOrders = () => {
 
             <button
               onClick={() => { setStatusTab('COMPLETED'); setSearchParams({ status: 'completed' }); }}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
                 statusTab === 'COMPLETED'
                   ? 'bg-teal-600 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -154,10 +231,34 @@ export const BuyerOrders = () => {
               <CheckCircle2 className="w-3.5 h-3.5" />
               Completed ({completedOrders.length})
             </button>
+
+            <button
+              onClick={() => { setStatusTab('RETURN_REQUESTED'); setSearchParams({ status: 'returned' }); }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                statusTab === 'RETURN_REQUESTED'
+                  ? 'bg-purple-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Returns ({returnRequestedOrders.length})
+            </button>
+
+            <button
+              onClick={() => { setStatusTab('CANCELLED'); setSearchParams({ status: 'cancelled' }); }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                statusTab === 'CANCELLED'
+                  ? 'bg-red-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              Cancelled ({cancelledOrders.length})
+            </button>
           </div>
 
           {/* Search Bar */}
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full sm:w-72 sm:ml-auto">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -170,7 +271,7 @@ export const BuyerOrders = () => {
         </div>
       </Card>
 
-      {/* ORDERS LIST (mirrors FarmerOrders list structure) */}
+      {/* ORDERS LIST */}
       <div className="space-y-4">
         {loading ? (
           <SkeletonLoader type="card" count={3} />
@@ -184,22 +285,36 @@ export const BuyerOrders = () => {
           </Card>
         ) : (
           filteredOrders.map((ord) => {
+            const isCancelled = ord.status === 'CANCELLED';
+            const isReturnRequested = ord.status === 'RETURN_REQUESTED';
             const isClaimed =
-              ord.payment?.payment_status === 'CLAIMED' ||
-              ord.status === 'PENDING_CONFIRMATION';
+              (ord.payment?.payment_status === 'CLAIMED' ||
+                ord.status === 'PENDING_CONFIRMATION') &&
+              !isCancelled &&
+              !isReturnRequested;
             const isPaid =
-              ord.payment?.payment_status === 'PAID' ||
-              ord.status === 'CONFIRMED' ||
-              ord.status === 'COMPLETED';
+              (ord.payment?.payment_status === 'PAID' ||
+                ord.status === 'CONFIRMED' ||
+                ord.status === 'COMPLETED') &&
+              !isReturnRequested;
             const isPending =
               ord.payment?.payment_status === 'PENDING' &&
-              !isClaimed && !isPaid;
+              !isClaimed &&
+              !isPaid &&
+              !isCancelled &&
+              !isReturnRequested;
+
+            const returnStatus = getReturnEligibility(ord);
 
             return (
               <Card
                 key={ord.order_id}
                 className={`p-6 border-2 ${
-                  isClaimed
+                  isCancelled
+                    ? 'border-red-200 bg-red-50/10'
+                    : isReturnRequested
+                    ? 'border-purple-200 bg-purple-50/10'
+                    : isClaimed
                     ? 'border-amber-400 bg-amber-50/20 shadow-md'
                     : isPaid
                     ? 'border-teal-200 bg-teal-50/10'
@@ -218,6 +333,18 @@ export const BuyerOrders = () => {
                         {formatDate(ord.order_date)}
                       </span>
 
+                      {isCancelled && (
+                        <span className="px-3 py-1 bg-red-100 text-red-800 font-extrabold text-xs rounded-full flex items-center gap-1 border border-red-300">
+                          <XCircle className="w-3.5 h-3.5 text-red-600" /> ORDER CANCELLED
+                        </span>
+                      )}
+
+                      {isReturnRequested && (
+                        <span className="px-3 py-1 bg-purple-100 text-purple-800 font-extrabold text-xs rounded-full flex items-center gap-1 border border-purple-300">
+                          <RotateCcw className="w-3.5 h-3.5 text-purple-600" /> RETURN REQUESTED
+                        </span>
+                      )}
+
                       {isClaimed && (
                         <span className="px-3 py-1 bg-amber-500 text-white font-extrabold text-xs rounded-full flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5" /> AWAITING FARMER CONFIRMATION
@@ -235,7 +362,7 @@ export const BuyerOrders = () => {
                       )}
                     </div>
 
-                    {/* Order Details Grid (mirrors FarmerOrders detail grid) */}
+                    {/* Order Details Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80">
                       <div>
                         <p className="text-[10px] text-slate-400 font-bold uppercase">Farmer Name</p>
@@ -292,8 +419,39 @@ export const BuyerOrders = () => {
                       </div>
                     )}
 
+                    {/* Cancelled Banner */}
+                    {isCancelled && (
+                      <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-1 text-red-950">
+                        <p className="text-xs font-bold flex items-center gap-1.5 text-red-800">
+                          <XCircle className="w-4 h-4 text-red-600" />
+                          Order Cancelled
+                        </p>
+                        <p className="text-xs text-red-700">
+                          <strong>Reason:</strong> {ord.cancel_reason || 'Cancelled by buyer.'}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Return Requested Banner */}
+                    {isReturnRequested && (
+                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-1.5 text-purple-950">
+                        <p className="text-xs font-bold flex items-center gap-1.5 text-purple-800">
+                          <RotateCcw className="w-4 h-4 text-purple-600" />
+                          Return Request Sent to Farmer ({ord.farmer_name})
+                        </p>
+                        <p className="text-xs text-purple-900">
+                          <strong>Reason:</strong> {ord.return_details?.reason || 'Return requested.'}
+                        </p>
+                        {ord.return_details?.note && (
+                          <p className="text-xs text-purple-800 italic bg-white/70 p-2 rounded border border-purple-200">
+                            "{ord.return_details.note}"
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Pickup location */}
-                    {ord.pickup_location && (
+                    {ord.pickup_location && !isCancelled && (
                       <div className="flex items-center gap-2 text-xs text-slate-600">
                         <MapPin className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                         <span>Pickup at farmgate: <strong>{ord.pickup_location}</strong></span>
@@ -301,25 +459,90 @@ export const BuyerOrders = () => {
                     )}
                   </div>
 
-                  {/* Right: Action Button */}
-                  <div className="flex flex-col gap-3 min-w-[200px]">
-                    <Button
-                      variant="primary"
-                      size="md"
-                      onClick={() => navigate(`/order-payment?order_id=${ord.order_id}`)}
-                      icon={ArrowRight}
-                      className="bg-indigo-600 hover:bg-indigo-700 shadow-md font-extrabold"
-                    >
-                      {isPending ? 'Pay Now' : 'View Details'}
-                    </Button>
+                  {/* Right: Action Buttons */}
+                  <div className="flex flex-col gap-3 min-w-[210px]">
+                    {!isCancelled && !isReturnRequested && (
+                      <Button
+                        variant="primary"
+                        size="md"
+                        onClick={() => navigate(`/order-payment?order_id=${ord.order_id}`)}
+                        icon={ArrowRight}
+                        className="bg-indigo-600 hover:bg-indigo-700 shadow-md font-extrabold"
+                      >
+                        {isPending ? 'Pay Now' : 'View Details'}
+                      </Button>
+                    )}
 
+                    {/* DOWNLOAD INVOICE BUTTON (Available for Paid / Completed orders) */}
                     {isPaid && (
-                      <div className="text-center p-3 bg-teal-100/60 rounded-xl border border-teal-200">
-                        <p className="text-xs font-bold text-teal-800 flex items-center gap-1 justify-center">
-                          <PackageCheck className="w-4 h-4 text-teal-600" /> Payment Verified
-                        </p>
-                        <p className="text-[10px] text-slate-500 mt-0.5">Ready for pickup at farmgate</p>
+                      <button
+                        onClick={() => setSelectedOrderForInvoice(ord)}
+                        className="w-full py-2 px-4 bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100 rounded-xl text-xs font-extrabold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                      >
+                        <FileText className="w-4 h-4 text-emerald-600" />
+                        Download Invoice
+                      </button>
+                    )}
+
+                    {/* Cancel Order Action (Allowed for pending / unconfirmed orders) */}
+                    {(isPending || isClaimed) && (
+                      <button
+                        onClick={() => {
+                          setSelectedOrderForCancel(ord);
+                          setCancelReason(CANCEL_REASONS[0]);
+                          setCustomCancelReason('');
+                        }}
+                        className="w-full py-2 px-4 rounded-xl border border-red-300 text-red-600 hover:bg-red-50 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <XCircle className="w-4 h-4 text-red-500" />
+                        Cancel Order
+                      </button>
+                    )}
+
+                    {/* Return Order Action (Allowed ONLY within 7 days of completion) */}
+                    {isPaid && (
+                      <div className="space-y-1.5">
+                        {returnStatus.eligible ? (
+                          <button
+                            onClick={() => {
+                              setSelectedOrderForReturn(ord);
+                              setReturnReason(RETURN_REASONS[0]);
+                              setReturnNote('');
+                            }}
+                            className="w-full py-2 px-4 rounded-xl border border-purple-300 text-purple-700 hover:bg-purple-50 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                          >
+                            <RotateCcw className="w-4 h-4 text-purple-600" />
+                            Request Return
+                          </button>
+                        ) : (
+                          <div className="p-2 bg-slate-100 rounded-xl border border-slate-200 text-center space-y-0.5">
+                            <p className="text-[11px] font-bold text-slate-500 flex items-center justify-center gap-1">
+                              <CalendarClock className="w-3.5 h-3.5 text-slate-400" />
+                              Return Expired
+                            </p>
+                            <p className="text-[10px] text-slate-400">7-day return limit exceeded</p>
+                          </div>
+                        )}
+
+                        {returnStatus.eligible && (
+                          <p className="text-[10px] text-center font-bold text-purple-700 flex items-center justify-center gap-1">
+                            <CalendarClock className="w-3 h-3 text-purple-500" />
+                            7-Day Policy ({returnStatus.daysLeft} day{returnStatus.daysLeft === 1 ? '' : 's'} left)
+                          </p>
+                        )}
                       </div>
+                    )}
+
+                    {(isCancelled || isReturnRequested) && (
+                      <Button
+                        variant="secondary"
+                        size="md"
+                        onClick={() => navigate(`/order-payment?order_id=${ord.order_id}`)}
+                        icon={ArrowRight}
+                        className="w-full font-bold text-xs"
+                      >
+                        View Details
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -328,6 +551,193 @@ export const BuyerOrders = () => {
           })
         )}
       </div>
+
+      {/* CANCEL ORDER MODAL */}
+      {selectedOrderForCancel && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-red-600">
+                <AlertCircle className="w-5 h-5" />
+                <h3 className="font-extrabold text-base text-slate-900">
+                  Cancel Order #{selectedOrderForCancel.order_id}?
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedOrderForCancel(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-slate-600">
+                Are you sure you want to cancel your order for{' '}
+                <strong>{selectedOrderForCancel.quantity} {t(selectedOrderForCancel.unit)} {selectedOrderForCancel.product_name}</strong>?
+                This will release the reserved stock back to <strong>{selectedOrderForCancel.farmer_name}</strong>.
+              </p>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Select Reason for Cancellation:
+                </label>
+                <select
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-red-500"
+                >
+                  {CANCEL_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {cancelReason === 'Other' && (
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Specify Reason:
+                  </label>
+                  <input
+                    type="text"
+                    value={customCancelReason}
+                    onChange={(e) => setCustomCancelReason(e.target.value)}
+                    placeholder="Enter your cancellation reason..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setSelectedOrderForCancel(null)}
+                disabled={submitting}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Keep Order
+              </button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleConfirmCancel}
+                disabled={submitting}
+                className="bg-red-600 hover:bg-red-700 text-white font-extrabold shadow-md cursor-pointer"
+              >
+                {submitting ? 'Cancelling...' : 'Confirm Cancellation'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RETURN ORDER MODAL */}
+      {selectedOrderForReturn && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-purple-700">
+                <RotateCcw className="w-5 h-5" />
+                <h3 className="font-extrabold text-base text-slate-900">
+                  Request Return for Order #{selectedOrderForReturn.order_id}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedOrderForReturn(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-slate-600">
+                Submitting return request for{' '}
+                <strong>{selectedOrderForReturn.quantity} {t(selectedOrderForReturn.unit)} {selectedOrderForReturn.product_name}</strong> (₹{selectedOrderForReturn.total_amount?.toLocaleString('en-IN')}) from <strong>{selectedOrderForReturn.farmer_name}</strong>.
+              </p>
+
+              {/* 7-Day Policy Notice */}
+              <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 text-xs text-purple-950 space-y-1">
+                <p className="font-extrabold flex items-center gap-1.5 text-purple-800">
+                  <CalendarClock className="w-4 h-4 text-purple-600" />
+                  Agriसाथी 7-Day Return Policy
+                </p>
+                <p className="text-[11px] text-purple-900 font-medium">
+                  This return request is within the allowed 7-day window from order completion date.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Return Reason:
+                </label>
+                <select
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-purple-500"
+                >
+                  {RETURN_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Additional Details / Note for Farmer:
+                </label>
+                <textarea
+                  rows={3}
+                  value={returnNote}
+                  onChange={(e) => setReturnNote(e.target.value)}
+                  placeholder="Describe the issue with produce quality, pickup discrepancy, etc..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-200/80 text-[11px] text-purple-900 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                <span>
+                  Farmer will be notified immediately to review your return request and arrange resolution/refund.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setSelectedOrderForReturn(null)}
+                disabled={submitting}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleConfirmReturn}
+                disabled={submitting}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold shadow-md cursor-pointer"
+              >
+                {submitting ? 'Submitting...' : 'Submit Return Request'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DOWNLOAD INVOICE MODAL */}
+      <InvoiceModal
+        order={selectedOrderForInvoice}
+        isOpen={!!selectedOrderForInvoice}
+        onClose={() => setSelectedOrderForInvoice(null)}
+      />
+
     </div>
   );
 };

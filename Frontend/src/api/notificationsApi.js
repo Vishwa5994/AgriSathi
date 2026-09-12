@@ -1,22 +1,25 @@
 import apiClient from './client';
-import { mockNotificationsApi } from './mockService';
 
 export const notificationsApi = {
-  getMine: async (user) => {
+  getMine: async () => {
     try {
       const response = await apiClient.get('/notifications/mine');
-      return response.data;
+      const res = response.data;
+      if (res.error) return [];
+      return Array.isArray(res.data) ? res.data : Array.isArray(res) ? res : [];
     } catch (e) {
-      return await mockNotificationsApi.getMine(user);
+      return [];
     }
   },
 
   markAsRead: async (notifId) => {
     try {
       const response = await apiClient.patch(`/notifications/${notifId}/read`);
-      return response.data;
+      const res = response.data;
+      return res.data || res;
     } catch (e) {
-      return await mockNotificationsApi.markAsRead(notifId);
+      console.error(`Failed to mark notification #${notifId} as read:`, e?.response?.data || e.message);
+      return null;
     }
   }
 };

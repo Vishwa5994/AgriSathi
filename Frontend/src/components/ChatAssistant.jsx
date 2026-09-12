@@ -2,7 +2,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { MOCK_PRODUCTS, MOCK_PRICE_HISTORY, MOCK_LISTINGS } from '../utils/mockData';
+import { productsApi } from '../api/productsApi';
+import { priceHistoryApi } from '../api/priceHistoryApi';
+import { listingsApi } from '../api/listingsApi';
 import {
   MessageCircle,
   X,
@@ -47,11 +49,8 @@ const getCityMultiplier = (city) => {
 // ─────────────────────────────────────────────────────────
 //  Smart AI Brain — rule-based intent + response generator
 // ─────────────────────────────────────────────────────────
-const buildKnowledgeBase = () => {
-  const products = MOCK_PRODUCTS;
-  const priceHistory = MOCK_PRICE_HISTORY;
-  const listings = MOCK_LISTINGS;
-  return { products, priceHistory, listings };
+const buildKnowledgeBase = (liveProducts = [], livePriceHistory = [], liveListings = []) => {
+  return { products: liveProducts, priceHistory: livePriceHistory, listings: liveListings };
 };
 
 const detectIntent = (text) => {

@@ -67,6 +67,30 @@ export const useOrders = () => {
     }
   };
 
+  const cancelOrder = async (orderId, reason) => {
+    try {
+      const updatedOrder = await ordersApi.cancelOrder(orderId, reason);
+      toast.success('Order cancelled successfully.');
+      fetchOrders();
+      return updatedOrder;
+    } catch (err) {
+      toast.error('Failed to cancel order');
+      throw err;
+    }
+  };
+
+  const returnOrder = async (orderId, reason, note) => {
+    try {
+      const updatedOrder = await ordersApi.returnOrder(orderId, reason, note);
+      toast.success('Return request submitted to farmer.');
+      fetchOrders();
+      return updatedOrder;
+    } catch (err) {
+      toast.error('Failed to submit return request');
+      throw err;
+    }
+  };
+
   return {
     orders,
     loading,
@@ -74,6 +98,8 @@ export const useOrders = () => {
     refetch: fetchOrders,
     createOrder,
     claimPayment,
-    confirmReceipt
+    confirmReceipt,
+    cancelOrder,
+    returnOrder
   };
 };

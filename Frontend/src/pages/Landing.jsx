@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +6,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { StatCounter } from '../components/StatCounter';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import { productsApi } from '../api/productsApi';
 import {
   Sprout,
   ArrowRight,
@@ -13,9 +14,9 @@ import {
   LineChart,
   CheckCircle2,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  ShoppingBag
 } from 'lucide-react';
-import { MOCK_PRODUCTS } from '../utils/mockData';
 import { PriceComparisonBadge } from '../components/PriceComparisonBadge';
 import { ProductImage } from '../components/ProductImage';
 
@@ -23,6 +24,21 @@ export const Landing = () => {
   const navigate = useNavigate();
   const { isAuthenticated, role } = useAuth();
   const { t } = useLanguage();
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    productsApi.getProducts().then((data) => {
+      if (isMounted) {
+        setProducts(data || []);
+        setLoadingProducts(false);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleFarmerActivity = () => {
     if (isAuthenticated && role === 'FARMER') {
@@ -40,9 +56,11 @@ export const Landing = () => {
     }
   };
 
+  const featuredProduct = products[0] || null;
+
   return (
     <div className="min-h-screen bg-slate-50 overflow-hidden">
-      {/* Live Ticker Marquee - Infinite scroll */}
+      {/* Live Ticker Marquee */}
       <div className="bg-emerald-950 text-emerald-200 text-xs py-2 border-b border-emerald-900 overflow-hidden">
         <div className="flex items-center gap-0">
           <span className="shrink-0 bg-emerald-800 text-amber-300 font-extrabold px-3 py-1 rounded text-[10px] uppercase flex items-center gap-1 z-10 mr-3 ml-3">
@@ -50,7 +68,6 @@ export const Landing = () => {
           </span>
           <div className="overflow-hidden flex-1">
             <div className="animate-marquee whitespace-nowrap flex items-center gap-8">
-              {/* Duplicated for seamless loop */}
               {[1, 2].map((n) => (
                 <React.Fragment key={n}>
                   <span className="shrink-0">🌾 {t('Sharbati Wheat')}: <strong className="text-white">₹2,450/Kg</strong> <span className="text-emerald-400">(-3% {t('vs Mandi')})</span></span>
@@ -58,11 +75,6 @@ export const Landing = () => {
                   <span className="shrink-0">🧅 {t('Nashik Red Onion')}: <strong className="text-white">₹1,980/Kg</strong> <span className="text-emerald-400">(-8% {t('vs Mandi')})</span></span>
                   <span className="shrink-0 mx-6">•</span>
                   <span className="shrink-0">🌾 {t('Basmati Rice 1121')}: <strong className="text-white">₹4,650/Kg</strong> <span className="text-emerald-400">(-4% {t('vs Mandi')})</span></span>
-                  <span className="shrink-0 mx-6">•</span>
-                  <span className="shrink-0">🍅 {t('Red Hybrid Tomatoes')}: <strong className="text-white">₹1,720/Kg</strong> <span className="text-emerald-400">(-7% {t('vs Mandi')})</span></span>
-                  <span className="shrink-0 mx-6">•</span>
-                  <span className="shrink-0">🌽 {t('Sweet Corn')}: <strong className="text-white">₹890/Kg</strong> <span className="text-emerald-400">(-5% {t('vs Mandi')})</span></span>
-                  <span className="shrink-0 mx-6">•</span>
                 </React.Fragment>
               ))}
             </div>
@@ -71,69 +83,66 @@ export const Landing = () => {
       </div>
 
       {/* Hero Section */}
-      <section className="relative pt-12 pb-20 lg:pt-20 lg:pb-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        {/* Background decorative glow */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-300/20 blur-3xl rounded-full pointer-events-none" />
-        <div className="absolute top-1/3 right-10 w-72 h-72 bg-amber-300/20 blur-3xl rounded-full pointer-events-none" />
-
+      <section className="relative py-12 md:py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          {/* Hero Left Content */}
+          
+          {/* Hero Content Left */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
-            className="lg:col-span-7 space-y-6"
+            className="lg:col-span-7 space-y-6 text-left"
           >
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-xs font-bold shadow-xs">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100/80 text-emerald-800 rounded-full text-xs font-bold border border-emerald-200">
               <Sprout className="w-4 h-4 text-emerald-600" />
-              <span>{t('Direct Producer-Buyer Platform')}</span>
+              <span>{t('Eliminate APMC Middleman Exploitation')}</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.1]">
-              {t('hero_title_1')}{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-emerald-700 to-amber-600">
-                {t('hero_title_2')}
-              </span>{' '}
-              {t('hero_title_3')}
+              {t('Direct Farmgate')} <br />
+              <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-amber-500 bg-clip-text text-transparent">
+                {t('B2B Trade Platform')}
+              </span>
             </h1>
 
-            <p className="text-lg text-slate-600 leading-relaxed max-w-2xl font-medium">
-              {t('hero_sub')}
+            <p className="text-base sm:text-lg text-slate-600 font-medium max-w-2xl leading-relaxed">
+              {t('Agriसाथी empowers Indian farmers to set their crop prices based on real APMC mandi data, sell directly to bulk buyers, and receive 100% instant UPI payouts without middleman cuts.')}
             </p>
 
-            {/* CTAs */}
-            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
               <Button
                 variant="primary"
                 size="lg"
                 onClick={handleFarmerActivity}
-                icon={Sprout}
-                className="shadow-xl"
+                icon={ArrowRight}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold shadow-lg shadow-emerald-600/20 cursor-pointer"
               >
-                {t('im_farmer')}
+                {t('Sell Your Harvest Direct')}
               </Button>
 
               <Button
                 variant="secondary"
                 size="lg"
                 onClick={handleBuyerActivity}
-                icon={ArrowRight}
-                className="shadow-xl"
+                icon={ChevronRight}
+                className="border-2 border-slate-300 text-slate-700 hover:bg-slate-100 font-extrabold cursor-pointer"
               >
-                {t('im_buyer')}
+                {t('Buy Produce as Wholesaler')}
               </Button>
             </div>
 
-            {/* Key trust bullets */}
-            <div className="pt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-200/80">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" /> {t('Direct UPI QR Pay')}
+            <div className="pt-6 border-t border-slate-200/80 flex items-center gap-6 text-xs text-slate-500 font-semibold flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>{t('0% Middleman Commission')}</span>
               </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" /> {t('Mandi Price Match')}
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>{t('Direct UPI Bank Settlement')}</span>
               </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" /> {t('Zero Commissions')}
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>{t('Agmarknet Mandi Benchmarks')}</span>
               </div>
             </div>
           </motion.div>
@@ -146,39 +155,46 @@ export const Landing = () => {
             className="lg:col-span-5"
           >
             <div className="relative mx-auto max-w-md">
-              {/* Main Demo Card */}
               <div className="glass-card rounded-3xl p-6 shadow-2xl border border-white/60 space-y-5 relative z-10">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <ProductImage
-                      src={MOCK_PRODUCTS[3].image_url}
-                      alt="Produce"
-                      className="w-14 h-14 rounded-2xl object-cover shadow-md border-2 border-white"
-                      iconClassName="w-6 h-6 text-slate-400"
-                    />
-                    <div>
-                      <h3 className="font-extrabold text-slate-900 text-base">{t(MOCK_PRODUCTS[3].product_name)}</h3>
-                      <p className="text-xs text-slate-500 font-semibold">{t('Farmer:')} Ramesh Patel (Nashik)</p>
+                {featuredProduct ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <ProductImage
+                          src={featuredProduct.picture || featuredProduct.image_url}
+                          alt="Produce"
+                          className="w-14 h-14 rounded-2xl object-cover shadow-md border-2 border-white"
+                          iconClassName="w-6 h-6 text-slate-400"
+                        />
+                        <div>
+                          <h3 className="font-extrabold text-slate-900 text-base">{t(featuredProduct.product_name)}</h3>
+                          <p className="text-xs text-slate-500 font-semibold">{t('Category:')} {featuredProduct.category}</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">
+                        {featuredProduct.unit || 'KG'}
+                      </span>
                     </div>
-                  </div>
-                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">
-                    {t('Grade A+')}
-                  </span>
-                </div>
 
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/70 space-y-3">
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">{t('asking_price')}</span>
-                    <div className="text-right">
-                      <span className="text-2xl font-black text-emerald-700">₹1,980</span>
-                      <span className="text-xs text-slate-500 font-bold"> / Kg</span>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/70 space-y-3">
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">{t('asking_price')}</span>
+                        <div className="text-right">
+                          <span className="text-2xl font-black text-emerald-700">₹{featuredProduct.mandi_avg_price || 1980}</span>
+                          <span className="text-xs text-slate-500 font-bold"> / {featuredProduct.unit || 'Kg'}</span>
+                        </div>
+                      </div>
+
+                      <PriceComparisonBadge askingPrice={featuredProduct.mandi_avg_price || 1980} mandiAvgPrice={(featuredProduct.mandi_avg_price || 1980) * 1.1} />
                     </div>
+                  </>
+                ) : (
+                  <div className="text-center py-6 space-y-2 text-slate-500">
+                    <ShoppingBag className="w-10 h-10 text-emerald-500 mx-auto" />
+                    <p className="font-bold text-sm text-slate-800">Agriसाथी Direct Market Active</p>
+                    <p className="text-xs text-slate-500">Connect directly with verified farmers &amp; buyers across India.</p>
                   </div>
-
-                  <PriceComparisonBadge askingPrice={1980} mandiAvgPrice={2150} />
-                </div>
-
-
+                )}
 
                 <Button
                   variant="primary"
@@ -310,80 +326,55 @@ export const Landing = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {MOCK_PRODUCTS.slice(0, 3).map((product) => (
-              <Card key={product.product_id} className="space-y-4">
-                <div className="relative h-48 rounded-xl overflow-hidden bg-slate-100">
-                  <ProductImage
-                    src={product.image_url}
-                    alt={product.product_name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    iconClassName="w-10 h-10 text-slate-300"
-                  />
-                  <span className="absolute top-3 right-3 px-3 py-1 bg-slate-900/80 backdrop-blur-md text-white text-xs font-bold rounded-full">
-                    {t(product.category)}
-                  </span>
-                </div>
+          {loadingProducts ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-64 bg-slate-200 rounded-2xl animate-pulse" />
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <Card className="p-12 text-center text-slate-500 space-y-3">
+              <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
+              <p className="font-bold text-slate-700">No products available at the moment.</p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {products.slice(0, 3).map((product) => (
+                <Card key={product.product_id} className="space-y-4">
+                  <div className="relative h-48 rounded-xl overflow-hidden bg-slate-100">
+                    <ProductImage
+                      src={product.picture || product.image_url}
+                      alt={product.product_name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      iconClassName="w-10 h-10 text-slate-300"
+                    />
+                    <span className="absolute top-3 right-3 px-3 py-1 bg-slate-900/80 backdrop-blur-md text-white text-xs font-bold rounded-full">
+                      {t(product.category || 'Produce')}
+                    </span>
+                  </div>
 
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">{t(product.product_name)}</h3>
-                  <p className="text-xs text-slate-500 font-semibold line-clamp-2 mt-1">
-                    {product.description}
-                  </p>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-slate-400 font-semibold uppercase">{t('Mandi Benchmark')}</p>
-                    <p className="text-base font-extrabold text-slate-900">
-                      ₹{product.mandi_avg_price.toLocaleString('en-IN')}{' '}
-                      <span className="text-xs font-normal text-slate-500">/ {t(product.unit)}</span>
+                    <h3 className="text-lg font-bold text-slate-900">{t(product.product_name)}</h3>
+                    <p className="text-xs text-slate-500 font-semibold line-clamp-2 mt-1">
+                      {product.description || 'Fresh agricultural produce direct from farm gate.'}
                     </p>
                   </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleBuyerActivity}
-                  >
-                    {t('View Deals')}
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* Call to Action Banner */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="relative rounded-3xl bg-gradient-to-r from-emerald-900 via-emerald-800 to-amber-900 p-8 sm:p-14 text-white overflow-hidden shadow-2xl">
-          <div className="relative z-10 max-w-2xl space-y-6">
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              {t('Ready to eliminate middleman cuts from your transactions?')}
-            </h2>
-            <p className="text-emerald-100 text-base font-medium">
-              {t("Join thousands of farmers and bulk buyers already trading fairly on India's direct agritech market platform.")}
-            </p>
-            <div className="flex flex-wrap gap-4 pt-2">
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={() => navigate('/signup')}
-                icon={Sprout}
-              >
-                {t('Create Account (Free)')}
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => navigate('/price-discovery')}
-                className="bg-white/10 text-white border-white/30 hover:bg-white/20"
-                icon={LineChart}
-              >
-                {t('Explore Price Discovery')}
-              </Button>
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-400 font-semibold uppercase">{t('Unit')}</p>
+                      <p className="text-base font-extrabold text-slate-900">
+                        {product.unit || 'KG'}
+                      </p>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={handleBuyerActivity} icon={ChevronRight}>
+                      {t('View Market')}
+                    </Button>
+                  </div>
+                </Card>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       </section>
     </div>

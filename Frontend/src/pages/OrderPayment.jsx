@@ -12,6 +12,7 @@ import { StepperProgress } from '../components/StepperProgress';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { SkeletonLoader } from '../components/SkeletonLoader';
+import { InvoiceModal } from '../components/InvoiceModal';
 import {
   QrCode,
   Smartphone,
@@ -26,7 +27,8 @@ import {
   Building,
   ShoppingBag,
   MapPin,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -212,6 +214,8 @@ export const OrderPayment = () => {
       </div>
     );
   }
+
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto space-y-8">
@@ -540,18 +544,34 @@ export const OrderPayment = () => {
               )}
 
               {currentOrder.payment?.payment_status === 'PAID' && (
-                <div className="p-6 bg-emerald-500 text-white rounded-2xl space-y-2 text-center shadow-lg">
+                <div className="p-6 bg-emerald-500 text-white rounded-2xl space-y-4 text-center shadow-lg">
                   <CheckCircle2 className="w-12 h-12 mx-auto stroke-[2.5]" />
-                  <h4 className="text-xl font-black">{t('payment_verified_heading')}</h4>
-                  <p className="text-xs text-emerald-100">
-                    {t('farmer_confirmed_amount')} ₹{totalAmount.toLocaleString('en-IN')}. {t('pickup_ready')}
-                  </p>
+                  <div>
+                    <h4 className="text-xl font-black">{t('payment_verified_heading')}</h4>
+                    <p className="text-xs text-emerald-100 mt-1">
+                      {t('farmer_confirmed_amount')} ₹{totalAmount.toLocaleString('en-IN')}. {t('pickup_ready')}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setShowInvoiceModal(true)}
+                    className="px-6 py-2.5 bg-white text-emerald-900 font-extrabold text-xs rounded-xl hover:bg-emerald-50 shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-700" />
+                    Download Official Tax Invoice
+                  </button>
                 </div>
               )}
             </Card>
           )}
         </div>
       </div>
+
+      <InvoiceModal
+        order={currentOrder}
+        isOpen={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+      />
     </div>
   );
 };

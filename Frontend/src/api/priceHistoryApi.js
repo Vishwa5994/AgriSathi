@@ -1,5 +1,4 @@
 import apiClient from './client';
-import { mockPriceHistoryApi } from './mockService';
 
 export const priceHistoryApi = {
   getPriceHistory: async (productId, location) => {
@@ -7,9 +6,12 @@ export const priceHistoryApi = {
       const response = await apiClient.get('/price-history', {
         params: { product_id: productId, location }
       });
-      return response.data;
+      const res = response.data;
+      if (res.error) return [];
+      return Array.isArray(res.data) ? res.data : Array.isArray(res) ? res : [];
     } catch (e) {
-      return await mockPriceHistoryApi.getPriceHistory(productId);
+      console.error('Failed to fetch price history:', e?.response?.data || e.message);
+      return [];
     }
   }
 };

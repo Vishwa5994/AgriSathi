@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { mockListingsApi, mockOrdersApi } from '../api/mockService';
-import { MOCK_USERS } from '../utils/mockData';
+import { listingsApi } from '../api/listingsApi';
+import { ordersApi } from '../api/ordersApi';
 import {
   ShieldCheck,
   Users,
@@ -33,7 +33,7 @@ import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const AdminDashboard = () => {
-  const { user, switchDemoRole } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -55,28 +55,7 @@ export const AdminDashboard = () => {
   const [bannerActive, setBannerActive] = useState(true);
 
   // Dispute tickets state
-  const [disputes, setDisputes] = useState([
-    {
-      dispute_id: 'dsp-101',
-      order_id: 'ord-8001',
-      farmer_name: 'Ramesh Kumar Patel',
-      buyer_name: 'Vikram Malhotra',
-      issue: 'Quality variance claim: Buyer claims 5% moisture above Grade A specs.',
-      amount: 59400,
-      status: 'OPEN',
-      created_at: '2026-09-09T10:00:00Z'
-    },
-    {
-      dispute_id: 'dsp-102',
-      order_id: 'ord-8002',
-      farmer_name: 'Sukhwinder Singh',
-      buyer_name: 'Priya Sharma',
-      issue: 'Logistics pick-up delayed by 24 hours due to heavy rain.',
-      amount: 139500,
-      status: 'RESOLVED',
-      created_at: '2026-09-07T14:30:00Z'
-    }
-  ]);
+  const [disputes, setDisputes] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -86,14 +65,14 @@ export const AdminDashboard = () => {
     setLoading(true);
     try {
       const storedUsersRaw = localStorage.getItem('agri_users');
-      const uList = storedUsersRaw ? JSON.parse(storedUsersRaw) : MOCK_USERS;
+      const uList = storedUsersRaw ? JSON.parse(storedUsersRaw) : [];
       setUsersList(uList);
 
-      const lList = await mockListingsApi.getListings();
-      setListingsList(lList);
+      const lList = await listingsApi.getListings();
+      setListingsList(lList || []);
 
-      const oList = await mockOrdersApi.getMine(null);
-      setOrdersList(oList);
+      const oList = await ordersApi.getMine();
+      setOrdersList(oList || []);
     } catch (e) {
       toast.error('Failed to load admin records');
     } finally {

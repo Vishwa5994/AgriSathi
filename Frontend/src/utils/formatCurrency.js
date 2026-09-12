@@ -43,3 +43,30 @@ export const formatTime = (dateString) => {
     minute: '2-digit',
   }).format(date);
 };
+
+export const getReturnEligibility = (order) => {
+  if (!order) return { eligible: false, daysElapsed: 0, daysLeft: 0 };
+
+  const isPaid =
+    order.payment?.payment_status === 'PAID' ||
+    order.status === 'CONFIRMED' ||
+    order.status === 'COMPLETED';
+
+  if (!isPaid || order.status === 'CANCELLED' || order.status === 'RETURN_REQUESTED') {
+    return { eligible: false, daysElapsed: 0, daysLeft: 0 };
+  }
+
+  const completionDateStr = order.payment?.paid_at || order.completed_at || order.order_date;
+  const completionDate = new Date(completionDateStr);
+  const now = new Date();
+
+  const diffMs = now.getTime() - completionDate.getTime();
+  const daysElapsed = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const daysLeft = Math.max(0, 7 - daysElapsed);
+
+  return {
+    eligible: daysElapsed <= 7,
+    daysElapsed,
+    daysLeft
+  };
+};
