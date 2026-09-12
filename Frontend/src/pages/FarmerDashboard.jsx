@@ -144,7 +144,7 @@ export const FarmerDashboard = () => {
                 </div>
               </div>
               <p className="text-xs text-emerald-700 font-semibold mt-3">
-                {totalListingsCount} Total Listed All-Time
+                {t('active_on_marketplace') || 'Active In-Stock on Marketplace'}
               </p>
             </>
           )}
@@ -245,14 +245,14 @@ export const FarmerDashboard = () => {
           </h3>
 
           <div className="space-y-2.5">
-            {/* Action 1: Product List */}
+            {/* Action 1: Product List (Shows active in-stock produce) */}
             <button
-              onClick={() => navigate('/my-products?view=table')}
+              onClick={() => navigate('/my-products?status=AVAILABLE&view=table')}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-3.5 rounded-2xl font-extrabold text-sm flex items-center justify-between transition-all shadow-sm cursor-pointer"
             >
               <div className="flex items-center gap-2.5">
                 <Package className="w-4 h-4 text-emerald-100" />
-                <span>{t('product_list') || 'Product List'} ({totalListingsCount})</span>
+                <span>{t('product_list') || 'Product List'} ({activeListingsCount})</span>
               </div>
               <ArrowRight className="w-4 h-4 text-white" />
             </button>

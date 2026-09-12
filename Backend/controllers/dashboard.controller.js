@@ -24,11 +24,11 @@ async function getFarmerDashboard(req, res) {
             [notifsAgg],
             [recentOrders]
         ] = await Promise.all([
-            // 1. Listings Aggregates
+            // 1. Listings Aggregates (Only active, in-stock produce)
             db.query(`
                 SELECT 
-                    COUNT(CASE WHEN status = 'AVAILABLE' THEN 1 END) as total_active_listings,
-                    COUNT(*) as total_listings
+                    COUNT(CASE WHEN status = 'AVAILABLE' AND quantity > 0 THEN 1 END) as total_active_listings,
+                    COUNT(CASE WHEN status = 'AVAILABLE' AND quantity > 0 THEN 1 END) as total_listings
                 FROM listings 
                 WHERE farmer_id = ?
             `, [farmerId]),
