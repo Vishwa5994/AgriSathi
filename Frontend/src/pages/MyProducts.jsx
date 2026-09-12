@@ -49,8 +49,8 @@ export const MyProducts = () => {
     farmer_id: user?.user_id
   });
 
-  const initialStatus = searchParams.get('status') || 'AVAILABLE';
-  const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
@@ -60,33 +60,14 @@ export const MyProducts = () => {
     } else if (view === 'photos') {
       setViewMode('photos');
     }
-    const status = searchParams.get('status');
-    if (status) {
-      setStatusFilter(status);
-    }
   }, [searchParams]);
-
-  const availableCount = listings.filter((l) => l.status === 'AVAILABLE' && Number(l.quantity ?? l.available_stock ?? 0) > 0).length;
-  const outOfStockCount = listings.filter((l) => l.status !== 'AVAILABLE' || Number(l.quantity ?? l.available_stock ?? 0) <= 0).length;
 
   const filteredListings = listings.filter((item) => {
     const matchesSearch =
       item.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.pickup_location?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const qty = Number(item.quantity ?? item.available_stock ?? 0);
-    const isAvailable = item.status === 'AVAILABLE' && qty > 0;
-
-    let matchesStatus = true;
-    if (statusFilter === 'AVAILABLE') {
-      matchesStatus = isAvailable;
-    } else if (statusFilter === 'OUT_OF_STOCK' || statusFilter === 'SOLD') {
-      matchesStatus = !isAvailable || item.status === 'SOLD' || item.status === 'EXPIRED';
-    } else if (statusFilter !== 'ALL') {
-      matchesStatus = item.status === statusFilter;
-    }
-
+    const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -119,7 +100,7 @@ export const MyProducts = () => {
         </button>
 
         <span className="text-xs font-semibold text-slate-500">
-          Farmer Produce Inventory ({filteredListings.length} {statusFilter === 'AVAILABLE' ? 'in-stock' : 'total'} items)
+          Farmer Produce Inventory ({listings.length} items)
         </span>
       </div>
 
@@ -169,58 +150,25 @@ export const MyProducts = () => {
           {/* Status Filter */}
           <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl flex-wrap">
             <button
-              onClick={() => {
-                setStatusFilter('AVAILABLE');
-                setSearchParams((prev) => {
-                  const p = new URLSearchParams(prev);
-                  p.set('status', 'AVAILABLE');
-                  return p;
-                });
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
-                statusFilter === 'AVAILABLE'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              In Stock / Available ({availableCount})
-            </button>
-            <button
-              onClick={() => {
-                setStatusFilter('ALL');
-                setSearchParams((prev) => {
-                  const p = new URLSearchParams(prev);
-                  p.set('status', 'ALL');
-                  return p;
-                });
-              }}
+              onClick={() => setStatusFilter('ALL')}
               className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
                 statusFilter === 'ALL'
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              All Records ({listings.length})
+              All ({listings.length})
             </button>
-            {outOfStockCount > 0 && (
-              <button
-                onClick={() => {
-                  setStatusFilter('OUT_OF_STOCK');
-                  setSearchParams((prev) => {
-                    const p = new URLSearchParams(prev);
-                    p.set('status', 'OUT_OF_STOCK');
-                    return p;
-                  });
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
-                  statusFilter === 'OUT_OF_STOCK'
-                    ? 'bg-slate-800 text-white shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Out of Stock ({outOfStockCount})
-              </button>
-            )}
+            <button
+              onClick={() => setStatusFilter('AVAILABLE')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                statusFilter === 'AVAILABLE'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Available ({listings.filter((l) => l.status === 'AVAILABLE').length})
+            </button>
           </div>
 
           {/* View Mode Toggle Switch (Photos vs Table) */}
