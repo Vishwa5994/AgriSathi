@@ -39,10 +39,10 @@ export const useOrders = () => {
     }
   };
 
-  const claimPayment = async (orderId, paymentMethod, txnRef) => {
+  const claimPayment = async (orderId, amount, paymentMethod, txnRef) => {
     try {
-      const updatedOrder = await ordersApi.claimPayment(orderId, paymentMethod, txnRef);
-      toast.success('Payment claim submitted! Farmer notified.');
+      const updatedOrder = await ordersApi.claimPayment(orderId, amount, paymentMethod, txnRef);
+      toast.success('Payment recorded successfully!');
       fetchOrders();
       return updatedOrder;
     } catch (err) {

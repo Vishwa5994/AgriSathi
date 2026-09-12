@@ -76,8 +76,56 @@ export const Signup = () => {
   };
 
   const handleGoogleRedirect = () => {
-    setIsGoogleModalOpen(true);
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '912210135-61me4mb0jupt8v1kkrvij3be06atlj88.apps.googleusercontent.com';
+    const redirectUri = window.location.origin + window.location.pathname;
+    const state = encodeURIComponent(JSON.stringify({ role: selectedRole }));
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile&state=${state}`;
+    window.location.href = googleAuthUrl;
   };
+
+  // Automated Google OAuth Redirect Callback Handler
+  React.useEffect(() => {
+    const hashOrQuery = window.location.hash || window.location.search;
+    if (hashOrQuery && (hashOrQuery.includes('access_token') || hashOrQuery.includes('id_token'))) {
+      const params = new URLSearchParams(hashOrQuery.replace('#', '?'));
+      const accessToken = params.get('access_token');
+      const stateRaw = params.get('state');
+      let role = selectedRole;
+      try {
+        if (stateRaw) {
+          const parsedState = JSON.parse(decodeURIComponent(stateRaw));
+          if (parsedState?.role) role = parsedState.role;
+        }
+      } catch (e) {
+        console.error('Failed to parse OAuth state', e);
+      }
+
+      if (accessToken) {
+        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        })
+          .then((res) => res.json())
+          .then(async (googleUser) => {
+            window.history.replaceState(null, null, window.location.pathname);
+            if (googleUser.email) {
+              setPendingGoogleUser({
+                email: googleUser.email,
+                name: googleUser.name || googleUser.given_name,
+                role: role,
+                picture: googleUser.picture
+              });
+              setIsProfileCompletionOpen(true);
+            } else {
+              setIsGoogleModalOpen(true);
+            }
+          })
+          .catch(async () => {
+            window.history.replaceState(null, null, window.location.pathname);
+            setIsGoogleModalOpen(true);
+          });
+      }
+    }
+  }, [navigate]);
 
   const handleGoogleSubmit = (accountData) => {
     setIsGoogleModalOpen(false);
@@ -478,60 +526,6 @@ export const Signup = () => {
                     </div>
                     <span className="text-[10px] font-extrabold bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-full uppercase">
                       Google User
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleGoogleSubmit({
-                        name: 'Ramesh Patel',
-                        email: 'ramesh.patel.farmer@gmail.com',
-                        picture: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-                      })
-                    }
-                    className="w-full p-3.5 bg-slate-50 hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 rounded-2xl transition-all flex items-center justify-between group cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shadow-xs text-sm">
-                        RP
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800 group-hover:text-emerald-900">
-                          Ramesh Patel
-                        </p>
-                        <p className="text-xs text-slate-500">ramesh.patel.farmer@gmail.com</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full uppercase">
-                      Farmer
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleGoogleSubmit({
-                        name: 'Vikram Malhotra',
-                        email: 'vikram.malhotra.buyer@gmail.com',
-                        picture: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'
-                      })
-                    }
-                    className="w-full p-3.5 bg-slate-50 hover:bg-indigo-50/80 border border-slate-200 hover:border-indigo-300 rounded-2xl transition-all flex items-center justify-between group cursor-pointer text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center shadow-xs text-sm">
-                        VM
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800 group-hover:text-indigo-900">
-                          Vikram Malhotra
-                        </p>
-                        <p className="text-xs text-slate-500">vikram.malhotra.buyer@gmail.com</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-full uppercase">
-                      Buyer
                     </span>
                   </button>
                 </div>

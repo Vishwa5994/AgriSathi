@@ -37,11 +37,12 @@ export const Notifications = () => {
             {t('No notifications available.')}
           </div>
         ) : (
-          notifications.map((n) => (
+          notifications.map((n, idx) => (
             <div
-              key={n.notification_id}
+              key={n.notification_id || n.id || idx}
               onClick={() => {
-                markAsRead(n.notification_id);
+                const notifId = n.notification_id || n.id;
+                if (notifId) markAsRead(notifId);
                 if (n.target_order_id) navigate('/orders');
               }}
               className={`py-4 px-2 flex items-start gap-4 transition-colors cursor-pointer hover:bg-slate-50 rounded-xl ${

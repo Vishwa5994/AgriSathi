@@ -7,8 +7,8 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { StepperProgress } from '../components/StepperProgress';
 import { SkeletonLoader } from '../components/SkeletonLoader';
-import { InvoiceModal } from '../components/InvoiceModal';
-import { formatDate, getReturnEligibility } from '../utils/formatCurrency';
+import { ProductImage } from '../components/ProductImage';
+import { formatDate, getReturnEligibility, formatBuyerUnitAndPrice } from '../utils/formatCurrency';
 import {
   ShoppingBag,
   Clock,
@@ -64,11 +64,9 @@ export const BuyerOrders = () => {
   const [returnReason, setReturnReason] = useState(RETURN_REASONS[0]);
   const [returnNote, setReturnNote] = useState('');
 
-  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null);
-
   const [submitting, setSubmitting] = useState(false);
 
-  const { orders, loading, cancelOrder, returnOrder } = useOrders();
+  const { orders, loading, error, cancelOrder, returnOrder, refetch } = useOrders();
 
   // All of this buyer's orders
   const buyerOrders = orders.filter(
@@ -273,7 +271,20 @@ export const BuyerOrders = () => {
 
       {/* ORDERS LIST */}
       <div className="space-y-4">
-        {loading ? (
+        {error ? (
+          <Card className="p-8 text-center space-y-4 bg-white border-slate-200">
+            <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 mx-auto flex items-center justify-center font-bold text-lg">
+              !
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-black text-slate-800">Failed to load orders</h3>
+              <p className="text-xs text-slate-500 font-medium">{error}</p>
+            </div>
+            <Button variant="primary" size="md" onClick={refetch} className="bg-indigo-600 hover:bg-indigo-700">
+              Retry Loading
+            </Button>
+          </Card>
+        ) : loading ? (
           <SkeletonLoader type="card" count={3} />
         ) : filteredOrders.length === 0 ? (
           <Card className="p-12 text-center text-slate-500 space-y-3">
@@ -325,67 +336,83 @@ export const BuyerOrders = () => {
                   {/* Order Info */}
                   <div className="space-y-4 flex-1">
                     {/* Order Header Row */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-extrabold text-slate-900 text-lg">
-                        Order #{ord.order_id}
-                      </span>
-                      <span className="text-xs text-slate-400 font-semibold">
-                        {formatDate(ord.order_date)}
-                      </span>
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <ProductImage
+                          src={ord.picture || ord.image_url || ord.product?.picture || ord.listing?.product?.picture}
+                          alt={ord.product_name || ord.product?.product_name || 'Produce'}
+                          className="w-14 h-14 rounded-2xl object-cover border border-slate-200/90 shadow-2xs"
+                        />
+                        <div>
+                          <span className="font-extrabold text-slate-900 text-lg block">
+                            Order #{ord.order_id} • {t(ord.product_name || ord.product?.product_name || ord.listing?.product?.product_name || 'Produce')}
+                          </span>
+                          <span className="text-xs text-slate-400 font-semibold">
+                            {formatDate(ord.order_date)}
+                          </span>
+                        </div>
+                      </div>
 
-                      {isCancelled && (
-                        <span className="px-3 py-1 bg-red-100 text-red-800 font-extrabold text-xs rounded-full flex items-center gap-1 border border-red-300">
-                          <XCircle className="w-3.5 h-3.5 text-red-600" /> ORDER CANCELLED
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {isCancelled && (
+                          <span className="px-3 py-1 bg-red-100 text-red-800 font-extrabold text-xs rounded-full flex items-center gap-1 border border-red-300">
+                            <XCircle className="w-3.5 h-3.5 text-red-600" /> ORDER CANCELLED
+                          </span>
+                        )}
 
-                      {isReturnRequested && (
-                        <span className="px-3 py-1 bg-purple-100 text-purple-800 font-extrabold text-xs rounded-full flex items-center gap-1 border border-purple-300">
-                          <RotateCcw className="w-3.5 h-3.5 text-purple-600" /> RETURN REQUESTED
-                        </span>
-                      )}
+                        {isReturnRequested && (
+                          <span className="px-3 py-1 bg-purple-100 text-purple-800 font-extrabold text-xs rounded-full flex items-center gap-1 border border-purple-300">
+                            <RotateCcw className="w-3.5 h-3.5 text-purple-600" /> RETURN REQUESTED
+                          </span>
+                        )}
 
-                      {isClaimed && (
-                        <span className="px-3 py-1 bg-amber-500 text-white font-extrabold text-xs rounded-full flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" /> AWAITING FARMER CONFIRMATION
-                        </span>
-                      )}
-                      {isPaid && (
-                        <span className="px-3 py-1 bg-teal-100 text-teal-800 font-extrabold text-xs rounded-full flex items-center gap-1 border border-teal-300">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" /> COMPLETED &amp; PAID
-                        </span>
-                      )}
-                      {isPending && (
-                        <span className="px-3 py-1 bg-slate-200 text-slate-700 font-extrabold text-xs rounded-full flex items-center gap-1">
-                          <AlertTriangle className="w-3.5 h-3.5" /> PAYMENT PENDING
-                        </span>
-                      )}
+                        {isClaimed && (
+                          <span className="px-3 py-1 bg-amber-500 text-white font-extrabold text-xs rounded-full flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" /> AWAITING FARMER CONFIRMATION
+                          </span>
+                        )}
+                        {isPaid && (
+                          <span className="px-3 py-1 bg-teal-100 text-teal-800 font-extrabold text-xs rounded-full flex items-center gap-1 border border-teal-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" /> COMPLETED &amp; PAID
+                          </span>
+                        )}
+                        {isPending && (
+                          <span className="px-3 py-1 bg-slate-200 text-slate-700 font-extrabold text-xs rounded-full flex items-center gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5" /> PAYMENT PENDING
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Order Details Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80">
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">Farmer Name</p>
-                        <p className="text-sm font-bold text-slate-800">{ord.farmer_name}</p>
-                        <p className="text-xs text-slate-500">{ord.farmer_business || 'Farm Producer'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">Produce Quantity</p>
-                        <p className="text-sm font-bold text-slate-800">
-                          {ord.quantity} {t(ord.unit)} {t(ord.product_name)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">Rate per {t(ord.unit)}</p>
-                        <p className="text-sm font-bold text-slate-800">₹{ord.price_per_unit}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">Total Amount</p>
-                        <p className="text-base font-black text-indigo-700">
-                          ₹{ord.total_amount?.toLocaleString('en-IN')}
-                        </p>
-                      </div>
-                    </div>
+                    {(() => {
+                      const { displayQuantity, displayPricePerUnit, displayUnit } = formatBuyerUnitAndPrice(ord.quantity, ord.price_per_unit, ord.unit);
+                      return (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase">Farmer Name</p>
+                            <p className="text-sm font-bold text-slate-800">{ord.farmer_name}</p>
+                            <p className="text-xs text-slate-500">{ord.pickup_location || ord.farmer_business || 'Farm Producer'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase">Produce Quantity</p>
+                            <p className="text-sm font-bold text-slate-800">
+                              {displayQuantity} {displayUnit} {t(ord.product_name)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase">Rate per {displayUnit}</p>
+                            <p className="text-sm font-bold text-slate-800">₹{displayPricePerUnit}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase">Total Amount</p>
+                            <p className="text-base font-black text-indigo-700">
+                              ₹{ord.total_amount?.toLocaleString('en-IN')}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Stepper Progress */}
                     <StepperProgress status={ord.status} paymentStatus={ord.payment?.payment_status} />
@@ -471,17 +498,6 @@ export const BuyerOrders = () => {
                       >
                         {isPending ? 'Pay Now' : 'View Details'}
                       </Button>
-                    )}
-
-                    {/* DOWNLOAD INVOICE BUTTON (Available for Paid / Completed orders) */}
-                    {isPaid && (
-                      <button
-                        onClick={() => setSelectedOrderForInvoice(ord)}
-                        className="w-full py-2 px-4 bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100 rounded-xl text-xs font-extrabold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                      >
-                        <FileText className="w-4 h-4 text-emerald-600" />
-                        Download Invoice
-                      </button>
                     )}
 
                     {/* Cancel Order Action (Allowed for pending / unconfirmed orders) */}
@@ -730,13 +746,6 @@ export const BuyerOrders = () => {
           </div>
         </div>
       )}
-
-      {/* DOWNLOAD INVOICE MODAL */}
-      <InvoiceModal
-        order={selectedOrderForInvoice}
-        isOpen={!!selectedOrderForInvoice}
-        onClose={() => setSelectedOrderForInvoice(null)}
-      />
 
     </div>
   );

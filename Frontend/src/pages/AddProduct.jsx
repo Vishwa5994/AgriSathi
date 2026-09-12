@@ -94,12 +94,12 @@ export const AddProduct = () => {
         setMode('edit');
         setSelectedListingId(found.listing_id);
         setSelectedProductId(found.product_id);
-        setImageUrl(found.image_url || '');
-        setQuantity(String(found.quantity || found.available_stock || 50));
+        setImageUrl(found.image_url || found.picture || '');
+        setQuantity(String(found.quantity ?? found.available_stock ?? 50));
         setAskingPrice(String(found.price_per_unit || 2000));
         setQualityGrade(found.quality_grade || 'Grade A+');
-        setHarvestDate(found.harvest_date || new Date().toISOString().split('T')[0]);
-        setPickupLocation(found.pickup_location || 'Farmgate APMC Yard');
+        setHarvestDate(found.harvest_date ? String(found.harvest_date).split('T')[0] : new Date().toISOString().split('T')[0]);
+        setPickupLocation(found.location || found.pickup_location || 'Farmgate APMC Yard');
       }
     }
   }, [editListingId, listings]);
@@ -149,6 +149,7 @@ export const AddProduct = () => {
         price_per_unit: Number(askingPrice),
         quality_grade: qualityGrade,
         harvest_date: harvestDate,
+        location: pickupLocation,
         pickup_location: pickupLocation,
         image_url: imageUrl || selectedProductObj?.image_url
       };

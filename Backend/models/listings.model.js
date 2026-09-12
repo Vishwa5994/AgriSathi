@@ -3,7 +3,7 @@ const db = require("../config/db");
 async function getAll(filters = {}) {
     try {
         let query = `
-            SELECT l.*, p.product_name, p.category, p.unit, u.name as farmer_name, u.phone as farmer_phone 
+            SELECT l.*, l.quantity as available_stock, p.product_name, p.category, p.unit, p.picture, p.picture as image_url, p.description, u.name as farmer_name, u.phone as farmer_phone 
             FROM listings l
             JOIN products p ON l.product_id = p.product_id
             JOIN users u ON l.farmer_id = u.user_id
@@ -42,7 +42,7 @@ async function getAll(filters = {}) {
 async function getById(id) {
     try {
         const [data] = await db.query(`
-            SELECT l.*, p.product_name, p.category, p.unit, u.name as farmer_name, u.phone as farmer_phone 
+            SELECT l.*, l.quantity as available_stock, p.product_name, p.category, p.unit, p.picture, p.picture as image_url, p.description, u.name as farmer_name, u.phone as farmer_phone 
             FROM listings l
             JOIN products p ON l.product_id = p.product_id
             JOIN users u ON l.farmer_id = u.user_id
@@ -58,7 +58,7 @@ async function getById(id) {
 async function getByFarmerId(farmerId) {
     try {
         const [data] = await db.query(`
-            SELECT l.*, p.product_name, p.category, p.unit 
+            SELECT l.*, l.quantity as available_stock, p.product_name, p.category, p.unit, p.picture, p.picture as image_url, p.description 
             FROM listings l
             JOIN products p ON l.product_id = p.product_id
             WHERE l.farmer_id = ?
@@ -120,6 +120,19 @@ async function updateStatus(id, status, client = db) {
     }
 }
 
+async function updateQuantityAndStatus(id, quantity, status, client = db) {
+    try {
+        const [result] = await client.query(
+            "UPDATE listings SET quantity = ?, status = ? WHERE listing_id = ?",
+            [quantity, status, id]
+        );
+        return result;
+    } catch (err) {
+        console.error("listings.model updateQuantityAndStatus error:", err);
+        throw err;
+    }
+}
+
 async function safeExec(connection, sql, params) {
     try {
         await connection.query(sql, params);
@@ -158,4 +171,4 @@ async function deleteById(id) {
     }
 }
 
-module.exports = { getAll, getById, getByFarmerId, insert, update, updateStatus, deleteById };
+module.exports = { getAll, getById, getByFarmerId, insert, update, updateStatus, updateQuantityAndStatus, deleteById };

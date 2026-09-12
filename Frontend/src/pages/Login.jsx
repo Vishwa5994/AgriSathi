@@ -58,8 +58,8 @@ export const Login = () => {
   } = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'ramesh.farmer@agrimarket.in',
-      password: 'password123'
+      email: '',
+      password: ''
     }
   });
 
@@ -185,7 +185,11 @@ export const Login = () => {
 
   const handleGoogleRedirect = (role = 'FARMER') => {
     setErrorMsg('');
-    setIsGoogleModalOpen(true);
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '912210135-61me4mb0jupt8v1kkrvij3be06atlj88.apps.googleusercontent.com';
+    const redirectUri = window.location.origin + window.location.pathname;
+    const state = encodeURIComponent(JSON.stringify({ role }));
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile&state=${state}`;
+    window.location.href = googleAuthUrl;
   };
 
   const handleGoogleSignInSubmit = (accountData) => {
@@ -214,59 +218,6 @@ export const Login = () => {
             {t('Access your farmer sales dashboard or buyer sourcing portal')}
           </p>
         </div>
-
-        {/* Quick Demo Login Presets */}
-        <Card className="bg-gradient-to-r from-[#032717] via-[#063821] to-[#042416] text-white border-none p-4 space-y-3 shadow-lg rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
-              <Sparkles className="w-4 h-4 text-amber-400" /> Instant 1-Click Demo Login
-            </div>
-            <span className="text-[10px] font-extrabold bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-full">
-              No Password Needed
-            </span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => handleQuickDemo('FARMER')}
-              className="p-2.5 bg-emerald-800/80 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold text-left cursor-pointer transition-all border border-emerald-500/40 flex flex-col justify-between group shadow-xs"
-            >
-              <div className="flex items-center gap-1.5 text-emerald-200 font-extrabold text-[10px] uppercase">
-                <UserCheck className="w-3.5 h-3.5 text-amber-300" /> Farmer
-              </div>
-              <div className="mt-1 font-black text-white text-xs group-hover:text-amber-300 transition-colors">
-                Ramesh Patel
-              </div>
-              <div className="text-[9px] text-emerald-300/80 font-medium truncate">Nashik • 12 Acres</div>
-            </button>
-
-            <button
-              onClick={() => handleQuickDemo('BUYER')}
-              className="p-2.5 bg-amber-700/80 hover:bg-amber-600 text-white rounded-xl text-[11px] font-bold text-left cursor-pointer transition-all border border-amber-500/40 flex flex-col justify-between group shadow-xs"
-            >
-              <div className="flex items-center gap-1.5 text-amber-200 font-extrabold text-[10px] uppercase">
-                <UserCheck className="w-3.5 h-3.5 text-emerald-300" /> Buyer
-              </div>
-              <div className="mt-1 font-black text-white text-xs group-hover:text-emerald-300 transition-colors">
-                Vikram Malhotra
-              </div>
-              <div className="text-[9px] text-amber-200/80 font-medium truncate">Wholesale • Mumbai</div>
-            </button>
-
-            <button
-              onClick={() => handleQuickDemo('ADMIN')}
-              className="p-2.5 bg-purple-900/80 hover:bg-purple-800 text-white rounded-xl text-[11px] font-bold text-left cursor-pointer transition-all border border-purple-500/40 flex flex-col justify-between group shadow-xs"
-            >
-              <div className="flex items-center gap-1.5 text-purple-200 font-extrabold text-[10px] uppercase">
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-300" /> Admin
-              </div>
-              <div className="mt-1 font-black text-white text-xs group-hover:text-purple-300 transition-colors">
-                APMC Director
-              </div>
-              <div className="text-[9px] text-purple-300/80 font-medium truncate">Master Control Panel</div>
-            </button>
-          </div>
-        </Card>
 
         {/* Login Form */}
         <Card className="p-6 sm:p-8 space-y-6 shadow-xl border-slate-200">

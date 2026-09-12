@@ -7,12 +7,11 @@ import { listingsApi } from '../api/listingsApi';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
 import { buildUpiLink } from '../utils/buildUpiLink';
-import { formatCurrency, formatDate } from '../utils/formatCurrency';
+import { formatCurrency, formatDate, formatBuyerUnitAndPrice, formatBuyerUnit } from '../utils/formatCurrency';
 import { StepperProgress } from '../components/StepperProgress';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { SkeletonLoader } from '../components/SkeletonLoader';
-import { InvoiceModal } from '../components/InvoiceModal';
 import {
   QrCode,
   Smartphone,
@@ -69,8 +68,9 @@ export const OrderPayment = () => {
       listingsApi.getListingById(listingIdParam).then((item) => {
         if (isMounted) {
           setListing(item);
-          if (item?.available_stock) {
-            setQuantity(Math.min(10, item.available_stock));
+          const stockVal = item?.quantity ?? item?.available_stock ?? 0;
+          if (stockVal > 0) {
+            setQuantity(Math.min(10, stockVal));
           }
           setLoading(false);
         }
@@ -90,11 +90,12 @@ export const OrderPayment = () => {
     try {
       const order = await createOrder({
         listing_id: listing.listing_id,
-        quantity: Number(quantity)
+        quantity: Number(quantity),
+        price_per_unit: listing.price_per_unit
       });
       setCurrentOrder(order);
     } catch (e) {
-      toast.error('Could not create order');
+      toast.error(e?.message || 'Could not create order');
     }
   };
 
@@ -103,11 +104,10 @@ export const OrderPayment = () => {
     if (!currentOrder) return;
     setSubmittingPayment(true);
     try {
-      const updated = await claimPayment(currentOrder.order_id, paymentMethod);
+      const updated = await claimPayment(currentOrder.order_id, totalAmount, paymentMethod);
       setCurrentOrder(updated);
-      toast.success('Payment claim sent! Farmer notified.');
     } catch (e) {
-      toast.error('Error claiming payment');
+      // Handled in hook
     } finally {
       setSubmittingPayment(false);
     }
@@ -142,6 +142,11 @@ export const OrderPayment = () => {
   const farmerName = listing?.farmer_name || currentOrder?.farmer_name || 'Ramesh Kumar Patel';
   const displayOrderId = currentOrder?.order_id || 'NEW-ORDER';
 
+  const rawUnit = listing?.unit || currentOrder?.unit || 'Quintal';
+  const rawRate = listing?.price_per_unit || currentOrder?.price_per_unit || 0;
+  const rawQty = currentOrder?.quantity || quantity || 1;
+  const { displayQuantity, displayPricePerUnit, displayUnit } = formatBuyerUnitAndPrice(rawQty, rawRate, rawUnit);
+
   // Razorpay Gateway Checkout Handler
   const handleRazorpayCheckout = () => {
     const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TaDJIjue6hVX9R';
@@ -157,12 +162,12 @@ export const OrderPayment = () => {
       currency: 'INR',
       name: 'Agriसाथी Direct Market',
       description: `Order #${displayOrderId} - ${t(listing?.product_name || currentOrder?.product_name || 'Agri Produce')}`,
-      image: listing?.image_url || 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=800&q=80',
+      image: listing?.picture || listing?.image_url || 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=800&q=80',
       handler: async function (response) {
         toast.success(`Razorpay Payment Successful! Txn ID: ${response.razorpay_payment_id}`);
         setSubmittingPayment(true);
         try {
-          const updated = await claimPayment(currentOrder?.order_id || displayOrderId, 'RAZORPAY');
+          const updated = await claimPayment(currentOrder?.order_id || displayOrderId, totalAmount, 'RAZORPAY', response.razorpay_payment_id);
           setCurrentOrder(updated);
         } catch {
           // fallback update
@@ -214,8 +219,6 @@ export const OrderPayment = () => {
       </div>
     );
   }
-
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto space-y-8">
@@ -283,9 +286,9 @@ export const OrderPayment = () => {
               </div>
 
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500 font-medium">{t('rate_per')} {t(listing?.unit || currentOrder?.unit || 'Kg')}</span>
+                <span className="text-slate-500 font-medium">{t('rate_per')} {displayUnit}</span>
                 <span className="font-bold text-slate-900">
-                  ₹{(listing?.price_per_unit || currentOrder?.price_per_unit || 0).toLocaleString('en-IN')}
+                  ₹{displayPricePerUnit.toLocaleString('en-IN')}
                 </span>
               </div>
 
@@ -293,19 +296,23 @@ export const OrderPayment = () => {
               {!currentOrder && listing && (
                 <div className="py-3 border-y border-slate-100 space-y-2">
                   <label className="block text-xs font-bold text-slate-700 uppercase">
-                    {t('select_quantity')} ({t(listing.unit)})
+                    {t('select_quantity')} ({displayUnit})
                   </label>
                   <input
                     type="number"
                     min="1"
-                    max={listing.available_stock}
-                    value={quantity}
+                    max={(listing.quantity ?? listing.available_stock ?? 0) * (rawUnit?.toLowerCase().includes('quintal') || rawUnit?.toLowerCase().includes('qtl') ? 100 : 1)}
+                    value={displayQuantity}
                     onWheel={(e) => e.target.blur()}
-                    onChange={(e) => setQuantity(Math.max(1, Math.abs(Number(e.target.value) || 1)))}
+                    onChange={(e) => {
+                      const val = Math.max(1, Math.abs(Number(e.target.value) || 1));
+                      const isQuintal = rawUnit?.toLowerCase().includes('quintal') || rawUnit?.toLowerCase().includes('qtl');
+                      setQuantity(isQuintal ? val / 100 : val);
+                    }}
                     className="w-full px-3.5 py-2 bg-emerald-50 border border-emerald-300 font-extrabold text-emerald-950 rounded-xl text-lg text-center"
                   />
                   <p className="text-[11px] text-slate-400 text-center font-medium">
-                    {t('available_stock')}: {listing.available_stock} {t(listing.unit)}
+                    {t('available_stock')}: {((listing.quantity ?? listing.available_stock ?? 0) * (rawUnit?.toLowerCase().includes('quintal') || rawUnit?.toLowerCase().includes('qtl') ? 100 : 1)).toLocaleString('en-IN')} {displayUnit}
                   </p>
                 </div>
               )}
@@ -314,7 +321,7 @@ export const OrderPayment = () => {
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500 font-medium">{t('order_quantity')}</span>
                   <span className="font-extrabold text-slate-900">
-                    {currentOrder.quantity} {t(currentOrder.unit)}
+                    {displayQuantity} {displayUnit}
                   </span>
                 </div>
               )}
@@ -552,26 +559,12 @@ export const OrderPayment = () => {
                       {t('farmer_confirmed_amount')} ₹{totalAmount.toLocaleString('en-IN')}. {t('pickup_ready')}
                     </p>
                   </div>
-
-                  <button
-                    onClick={() => setShowInvoiceModal(true)}
-                    className="px-6 py-2.5 bg-white text-emerald-900 font-extrabold text-xs rounded-xl hover:bg-emerald-50 shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <FileText className="w-4 h-4 text-emerald-700" />
-                    Download Official Tax Invoice
-                  </button>
                 </div>
               )}
             </Card>
           )}
         </div>
       </div>
-
-      <InvoiceModal
-        order={currentOrder}
-        isOpen={showInvoiceModal}
-        onClose={() => setShowInvoiceModal(false)}
-      />
     </div>
   );
 };

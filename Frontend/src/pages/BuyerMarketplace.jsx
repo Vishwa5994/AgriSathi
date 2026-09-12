@@ -11,7 +11,7 @@ import { SkeletonLoader } from '../components/SkeletonLoader';
 import { ProductImage } from '../components/ProductImage';
 import { LoginRequiredModal } from '../components/LoginRequiredModal';
 import { Modal } from '../components/Modal';
-import { formatDate } from '../utils/formatCurrency';
+import { formatDate, formatBuyerUnitAndPrice, formatBuyerUnit } from '../utils/formatCurrency';
 import {
   ShoppingBag,
   Search,
@@ -33,7 +33,7 @@ export const BuyerMarketplace = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
 
-  const { listings, loading, updateFilters, filters } = useListings();
+  const { listings, loading, error, updateFilters, filters, refetch } = useListings();
 
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -245,7 +245,20 @@ export const BuyerMarketplace = () => {
       </Card>
 
       {/* CONTENT AREA: PHOTOS GRID vs TABLE VIEW */}
-      {loading ? (
+      {error ? (
+        <Card className="p-8 text-center space-y-4 bg-white border-slate-200">
+          <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 mx-auto flex items-center justify-center font-bold text-lg">
+            !
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-black text-slate-800">Failed to load marketplace listings</h3>
+            <p className="text-xs text-slate-500 font-medium">{error}</p>
+          </div>
+          <Button variant="primary" size="md" onClick={refetch} className="bg-indigo-600 hover:bg-indigo-700">
+            Retry Loading
+          </Button>
+        </Card>
+      ) : loading ? (
         <Card className="p-6">
           <SkeletonLoader type="card" count={6} />
         </Card>
@@ -266,90 +279,98 @@ export const BuyerMarketplace = () => {
 
         /* ── PHOTO GRID VIEW (mirrors MyProducts photo grid) ── */
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filteredListings.map((item) => (
-            <div
-              key={item.listing_id}
-              className="group bg-white rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
-            >
-              {/* Product Photo */}
-              <div className="relative aspect-4/3 overflow-hidden bg-slate-100">
-                <ProductImage
-                  src={item.image_url}
-                  alt={item.product_name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  iconClassName="w-10 h-10 text-slate-400"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80" />
+          {filteredListings.map((item) => {
+            const stockQty = item.quantity ?? item.available_stock ?? 0;
+            const { displayQuantity, displayPricePerUnit, displayUnit } = formatBuyerUnitAndPrice(
+              stockQty,
+              item.price_per_unit,
+              item.unit
+            );
+            return (
+              <div
+                key={item.listing_id}
+                className="group bg-white rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
+              >
+                {/* Product Photo */}
+                <div className="relative aspect-4/3 overflow-hidden bg-slate-100">
+                  <ProductImage
+                    src={item.picture || item.image_url}
+                    alt={item.product_name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    iconClassName="w-10 h-10 text-slate-400"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80" />
 
-                {/* Grade Badge */}
-                <div className="absolute top-3 left-3">
-                  <span className="px-2.5 py-1 bg-indigo-600/90 backdrop-blur-md text-white text-xs font-black uppercase rounded-lg shadow-sm">
-                    Grade {getGradeAlphabet(item.quality_grade)}
-                  </span>
-                </div>
-
-                {/* Location + Floating Price Tag */}
-                <div className="absolute bottom-3 left-3 right-3 text-white space-y-1">
-                  <div className="flex items-center gap-1 text-[11px] text-slate-200">
-                    <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
-                    <span className="truncate">{item.farmer_location}</span>
-                  </div>
-                  <p className="text-lg font-black tracking-tight drop-shadow-md">
-                    ₹{item.price_per_unit?.toLocaleString('en-IN')}{' '}
-                    <span className="text-xs font-normal text-slate-200">/ {t(item.unit)}</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Card Details */}
-              <div className="p-4 space-y-3 bg-white flex-1 flex flex-col justify-between">
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-base group-hover:text-indigo-700 transition-colors">
-                    {t(item.product_name)}
-                  </h3>
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                    <span className="font-bold text-slate-700">{t('farmer')}: {item.farmer_name}</span>
-                    <span className="flex items-center gap-0.5 text-amber-500 font-bold">
-                      <Star className="w-3 h-3 fill-amber-400" /> {item.farmer_rating || 4.9}
+                  {/* Grade Badge */}
+                  <div className="absolute top-3 left-3">
+                    <span className="px-2.5 py-1 bg-indigo-600/90 backdrop-blur-md text-white text-xs font-black uppercase rounded-lg shadow-sm">
+                      Grade {getGradeAlphabet(item.quality_grade)}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Stock: <strong className="text-slate-800">{item.available_stock} {t(item.unit)}</strong>
-                  </p>
+
+                  {/* Location + Floating Price Tag */}
+                  <div className="absolute bottom-3 left-3 right-3 text-white space-y-1">
+                    <div className="flex items-center gap-1 text-[11px] text-slate-200">
+                      <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span className="truncate">{item.farmer_location}</span>
+                    </div>
+                    <p className="text-lg font-black tracking-tight drop-shadow-md">
+                      ₹{displayPricePerUnit.toLocaleString('en-IN')}{' '}
+                      <span className="text-xs font-normal text-slate-200">/ {displayUnit}</span>
+                    </p>
+                  </div>
                 </div>
 
-                <PriceComparisonBadge
-                  askingPrice={item.price_per_unit}
-                  mandiAvgPrice={item.mandi_avg_price}
-                  compact
-                />
+                {/* Card Details */}
+                <div className="p-4 space-y-3 bg-white flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-base group-hover:text-indigo-700 transition-colors">
+                      {t(item.product_name)}
+                    </h3>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                      <span className="font-bold text-slate-700">{t('farmer')}: {item.farmer_name}</span>
+                      <span className="flex items-center gap-0.5 text-amber-500 font-bold">
+                        <Star className="w-3 h-3 fill-amber-400" /> {item.farmer_rating || 4.9}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Stock: <strong className="text-slate-800">{displayQuantity.toLocaleString('en-IN')} {displayUnit}</strong>
+                    </p>
+                  </div>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleGuardedAction(t('view_details'), () => setSelectedListing(item))}
-                    className="text-xs"
-                  >
-                    {t('view_details')}
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() =>
-                      handleGuardedAction(t('buy_now'), () =>
-                        navigate(`/order-payment?listing_id=${item.listing_id}`)
-                      )
-                    }
-                    icon={ShoppingBag}
-                    className="bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    {t('buy_now')}
-                  </Button>
+                  <PriceComparisonBadge
+                    askingPrice={displayPricePerUnit}
+                    mandiAvgPrice={item.mandi_avg_price ? item.mandi_avg_price / (item.unit?.toLowerCase().includes('quintal') || item.unit?.toLowerCase().includes('qtl') ? 100 : 1) : undefined}
+                    compact
+                  />
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleGuardedAction(t('view_details'), () => setSelectedListing(item))}
+                      className="text-xs"
+                    >
+                      {t('view_details')}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() =>
+                        handleGuardedAction(t('buy_now'), () =>
+                          navigate(`/order-payment?listing_id=${item.listing_id}`)
+                        )
+                      }
+                      icon={ShoppingBag}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      {t('buy_now')}
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
       ) : (
@@ -371,96 +392,104 @@ export const BuyerMarketplace = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-                {filteredListings.map((item) => (
-                  <tr key={item.listing_id} className="hover:bg-slate-50/80 transition-colors">
+                {filteredListings.map((item) => {
+                  const stockQty = item.quantity ?? item.available_stock ?? 0;
+                  const { displayQuantity, displayPricePerUnit, displayUnit } = formatBuyerUnitAndPrice(
+                    stockQty,
+                    item.price_per_unit,
+                    item.unit
+                  );
+                  return (
+                    <tr key={item.listing_id} className="hover:bg-slate-50/80 transition-colors">
 
-                    {/* Crop Produce Name & Image */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-3">
-                        <ProductImage
-                          src={item.image_url}
-                          alt={item.product_name}
-                          className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-100"
-                          iconClassName="w-5 h-5 text-slate-400"
-                        />
-                        <div>
-                          <p className="font-extrabold text-slate-900 text-sm">{t(item.product_name)}</p>
-                          <span className="text-[10px] text-slate-400 uppercase font-bold">
-                            {t(item.category)} • ID #{item.listing_id}
-                          </span>
+                      {/* Crop Produce Name & Image */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <ProductImage
+                            src={item.picture || item.image_url}
+                            alt={item.product_name}
+                            className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-100"
+                            iconClassName="w-5 h-5 text-slate-400"
+                          />
+                          <div>
+                            <p className="font-extrabold text-slate-900 text-sm">{t(item.product_name)}</p>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold">
+                              {t(item.category)} • ID #{item.listing_id}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Farmer */}
-                    <td className="py-3.5 px-4">
-                      <p className="font-bold text-slate-800">{item.farmer_name}</p>
-                      <div className="flex items-center gap-1 text-amber-500 text-[11px]">
-                        <Star className="w-3 h-3 fill-amber-400" />
-                        <span className="font-bold">{item.farmer_rating || 4.9}</span>
-                      </div>
-                    </td>
+                      {/* Farmer */}
+                      <td className="py-3.5 px-4">
+                        <p className="font-bold text-slate-800">{item.farmer_name}</p>
+                        <div className="flex items-center gap-1 text-amber-500 text-[11px]">
+                          <Star className="w-3 h-3 fill-amber-400" />
+                          <span className="font-bold">{item.farmer_rating || 4.9}</span>
+                        </div>
+                      </td>
 
-                    {/* Quality Grade */}
-                    <td className="py-3.5 px-4">
-                      <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-black rounded-lg border border-indigo-300 inline-block text-center shadow-2xs">
-                        {getGradeAlphabet(item.quality_grade)}
-                      </span>
-                    </td>
+                      {/* Quality Grade */}
+                      <td className="py-3.5 px-4">
+                        <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-black rounded-lg border border-indigo-300 inline-block text-center shadow-2xs">
+                          {getGradeAlphabet(item.quality_grade)}
+                        </span>
+                      </td>
 
-                    {/* Available Stock */}
-                    <td className="py-3.5 px-4 font-black text-slate-900">
-                      {item.available_stock} {t(item.unit)}
-                    </td>
+                      {/* Available Stock */}
+                      <td className="py-3.5 px-4 font-black text-slate-900">
+                        {displayQuantity.toLocaleString('en-IN')} {displayUnit}
+                      </td>
 
-                    {/* Asking Price */}
-                    <td className="py-3.5 px-4">
-                      <p className="font-black text-indigo-700 text-sm">
-                        ₹{item.price_per_unit?.toLocaleString('en-IN')}{' '}
-                        <span className="text-[10px] font-medium text-slate-400">/ {t(item.unit)}</span>
-                      </p>
-                    </td>
+                      {/* Asking Price */}
+                      <td className="py-3.5 px-4">
+                        <p className="font-black text-indigo-700 text-sm">
+                          ₹{displayPricePerUnit.toLocaleString('en-IN')}{' '}
+                          <span className="text-[10px] font-medium text-slate-400">/ {displayUnit}</span>
+                        </p>
+                      </td>
 
-                    {/* Mandi Benchmark */}
-                    <td className="py-3.5 px-4">
-                      <PriceComparisonBadge
-                        askingPrice={item.price_per_unit}
-                        mandiAvgPrice={item.mandi_avg_price}
-                        compact
-                      />
-                    </td>
+                      {/* Mandi Benchmark */}
+                      <td className="py-3.5 px-4">
+                        <PriceComparisonBadge
+                          askingPrice={displayPricePerUnit}
+                          mandiAvgPrice={item.mandi_avg_price ? item.mandi_avg_price / (item.unit?.toLowerCase().includes('quintal') || item.unit?.toLowerCase().includes('qtl') ? 100 : 1) : undefined}
+                          compact
+                        />
+                      </td>
 
-                    {/* Pickup Location */}
-                    <td className="py-3.5 px-4 text-slate-600">
-                      <div className="flex items-center gap-1.5 max-w-[160px]">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate">{item.farmer_location}</span>
-                      </div>
-                    </td>
+                      {/* Pickup Location */}
+                      <td className="py-3.5 px-4 text-slate-600">
+                        <div className="flex items-center gap-1.5 max-w-[160px]">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{item.farmer_location}</span>
+                        </div>
+                      </td>
 
-                    {/* Actions */}
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleGuardedAction(t('view_details'), () => setSelectedListing(item))}
-                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          Details
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleGuardedAction(t('buy_now'), () =>
-                              navigate(`/order-payment?listing_id=${item.listing_id}`)
-                            )
-                          }
-                          className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <ShoppingBag className="w-3.5 h-3.5" /> Buy
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleGuardedAction(t('view_details'), () => setSelectedListing(item))}
+                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            Details
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleGuardedAction(t('buy_now'), () =>
+                                navigate(`/order-payment?listing_id=${item.listing_id}`)
+                              )
+                            }
+                            className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5" /> Buy
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -474,85 +503,93 @@ export const BuyerMarketplace = () => {
         title={t(selectedListing?.product_name) || t('listing_details')}
         maxWidth="max-w-2xl"
       >
-        {selectedListing && (
-          <div className="space-y-6">
-            <div className="h-56 rounded-2xl overflow-hidden bg-slate-100">
-              <ProductImage
-                src={selectedListing.image_url}
-                alt={selectedListing.product_name}
-                className="w-full h-full object-cover"
-                iconClassName="w-12 h-12 text-slate-400"
+        {selectedListing && (() => {
+          const modalStock = selectedListing.quantity ?? selectedListing.available_stock ?? 0;
+          const { displayQuantity, displayPricePerUnit, displayUnit } = formatBuyerUnitAndPrice(
+            modalStock,
+            selectedListing.price_per_unit,
+            selectedListing.unit
+          );
+          return (
+            <div className="space-y-6">
+              <div className="h-56 rounded-2xl overflow-hidden bg-slate-100">
+                <ProductImage
+                  src={selectedListing.picture || selectedListing.image_url}
+                  alt={selectedListing.product_name}
+                  className="w-full h-full object-cover"
+                  iconClassName="w-12 h-12 text-slate-400"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl font-black text-slate-900">{t(selectedListing.product_name)}</h3>
+                  <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-extrabold rounded-full">
+                    {t(selectedListing.quality_grade)}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 font-semibold flex items-center gap-2">
+                  <span>{t('farmer')}: {selectedListing.farmer_name}</span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1 text-amber-500 font-bold">
+                    <Star className="w-3.5 h-3.5 fill-amber-400" /> {selectedListing.farmer_rating} {t('farmer_rating')}
+                  </span>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">{t('asking_direct_price')}</p>
+                  <p className="text-2xl font-black text-indigo-700">
+                    ₹{displayPricePerUnit.toLocaleString('en-IN')}{' '}
+                    <span className="text-xs font-normal text-slate-500">/ {displayUnit}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">{t('stock_available')}</p>
+                  <p className="text-xl font-extrabold text-slate-900">
+                    {displayQuantity.toLocaleString('en-IN')} {displayUnit}
+                  </p>
+                </div>
+              </div>
+
+              <PriceComparisonBadge
+                askingPrice={displayPricePerUnit}
+                mandiAvgPrice={selectedListing.mandi_avg_price ? selectedListing.mandi_avg_price / (selectedListing.unit?.toLowerCase().includes('quintal') || selectedListing.unit?.toLowerCase().includes('qtl') ? 100 : 1) : undefined}
               />
-            </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-black text-slate-900">{t(selectedListing.product_name)}</h3>
-                <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-extrabold rounded-full">
-                  {t(selectedListing.quality_grade)}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 font-semibold flex items-center gap-2">
-                <span>{t('farmer')}: {selectedListing.farmer_name}</span>
-                <span>•</span>
-                <span className="flex items-center gap-1 text-amber-500 font-bold">
-                  <Star className="w-3.5 h-3.5 fill-amber-400" /> {selectedListing.farmer_rating} {t('farmer_rating')}
-                </span>
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase">{t('asking_direct_price')}</p>
-                <p className="text-2xl font-black text-indigo-700">
-                  ₹{selectedListing.price_per_unit.toLocaleString('en-IN')}{' '}
-                  <span className="text-xs font-normal text-slate-500">/ {t(selectedListing.unit)}</span>
+              <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200 text-xs space-y-1">
+                <p className="font-bold text-indigo-900 flex items-center gap-1.5">
+                  <QrCode className="w-4 h-4 text-indigo-600" /> {t('direct_farmer_upi')}
+                </p>
+                <p className="text-indigo-800">
+                  {t('upi_target')} <strong>{selectedListing.farmer_upi}</strong> • {t('pickup_point')}{' '}
+                  {selectedListing.pickup_location}
                 </p>
               </div>
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase">{t('stock_available')}</p>
-                <p className="text-xl font-extrabold text-slate-900">
-                  {selectedListing.available_stock} {t(selectedListing.unit)}
-                </p>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
+                <Button variant="outline" onClick={() => setSelectedListing(null)}>
+                  {t('close')}
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    const id = selectedListing.listing_id;
+                    setSelectedListing(null);
+                    handleGuardedAction(t('proceed_checkout'), () =>
+                      navigate(`/order-payment?listing_id=${id}`)
+                    );
+                  }}
+                  icon={ShoppingBag}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  {t('proceed_checkout')}
+                </Button>
               </div>
             </div>
-
-            <PriceComparisonBadge
-              askingPrice={selectedListing.price_per_unit}
-              mandiAvgPrice={selectedListing.mandi_avg_price}
-            />
-
-            <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200 text-xs space-y-1">
-              <p className="font-bold text-indigo-900 flex items-center gap-1.5">
-                <QrCode className="w-4 h-4 text-indigo-600" /> {t('direct_farmer_upi')}
-              </p>
-              <p className="text-indigo-800">
-                {t('upi_target')} <strong>{selectedListing.farmer_upi}</strong> • {t('pickup_point')}{' '}
-                {selectedListing.pickup_location}
-              </p>
-            </div>
-
-            <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
-              <Button variant="outline" onClick={() => setSelectedListing(null)}>
-                {t('close')}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  const id = selectedListing.listing_id;
-                  setSelectedListing(null);
-                  handleGuardedAction(t('proceed_checkout'), () =>
-                    navigate(`/order-payment?listing_id=${id}`)
-                  );
-                }}
-                icon={ShoppingBag}
-                className="bg-indigo-600 hover:bg-indigo-700"
-              >
-                {t('proceed_checkout')}
-              </Button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </Modal>
 
       {/* LOGIN REQUIRED MODAL */}

@@ -41,29 +41,21 @@ export const authApi = {
   },
 
   loginWithGoogle: async (googleData) => {
-    try {
-      const response = await apiClient.post('/auth/google', googleData);
-      const data = response.data;
-      if (data.token) {
-        localStorage.setItem('agri_auth_token', data.token);
-      }
-      if (data.user) {
-        localStorage.setItem('agri_user', JSON.stringify(data.user));
-      }
-      return { user: data.user || data.data, token: data.token };
-    } catch (e) {
-      // If backend google route is unavailable, return formatted user object from token/payload
-      const fallbackUser = {
-        user_id: googleData.user_id || `usr-${Date.now()}`,
-        name: googleData.name || 'Google User',
-        email: googleData.email,
-        phone: googleData.phone || '',
-        role: googleData.role || 'FARMER',
-        picture: googleData.picture || null,
-        profile: googleData.profile || {}
-      };
-      return { user: fallbackUser, token: `jwt-google-${Date.now()}` };
+    const response = await apiClient.post('/auth/login', {
+      email: googleData.email,
+      password: googleData.password || 'GoogleOAuth2026!'
+    });
+    const data = response.data;
+    if (data.error) {
+      throw new Error(data.message || 'Google Sign-In failed');
     }
+    if (data.token) {
+      localStorage.setItem('agri_auth_token', data.token);
+    }
+    if (data.user) {
+      localStorage.setItem('agri_user', JSON.stringify(data.user));
+    }
+    return { user: data.user || data.data, token: data.token };
   },
 
   getCurrentUser: async () => {
@@ -77,8 +69,14 @@ export const authApi = {
     }
   },
 
-  updateProfile: async (userId, profileData) => {
-    const response = await apiClient.put(`/users/${userId}/profile`, profileData);
+  updateProfile: async (userId, profileData, role = 'FARMER') => {
+    let endpoint = `/users/${userId}`;
+    if (role === 'FARMER') {
+      endpoint = `/farmer-profiles/${userId}`;
+    } else if (role === 'BUYER') {
+      endpoint = `/buyer-profiles/${userId}`;
+    }
+    const response = await apiClient.put(endpoint, profileData);
     const data = response.data;
     if (data.error) {
       throw new Error(data.message || 'Failed to update profile');

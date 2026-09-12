@@ -52,9 +52,9 @@ export const FarmerDashboard = () => {
 
   // Calculate Metrics
   const activeListingsCount = listings.filter((l) => l.status === 'AVAILABLE').length;
-  const incomingOrders = orders.filter(
-    (o) => o.farmer_id === user?.user_id || o.farmer_name === user?.name || true
-  );
+  const incomingOrders = user?.user_id
+    ? orders.filter((o) => Number(o.farmer_id) === Number(user.user_id) || o.farmer_name === user?.name)
+    : orders;
   const pendingClaimsCount = incomingOrders.filter(
     (o) => o.payment?.payment_status === 'CLAIMED' || o.status === 'PENDING_CONFIRMATION' || o.status === 'PENDING'
   ).length;
@@ -164,79 +164,6 @@ export const FarmerDashboard = () => {
         </Card>
       </div>
 
-      {/* 3. WEEK-WISE SUMMARY SECTION */}
-      <Card className="bg-white border-slate-200/90 shadow-sm p-6 space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[11px] font-bold">
-              <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
-              This Week's Analytics
-            </div>
-            <h2 className="text-lg font-black text-slate-900 mt-1">Week-Wise Summary</h2>
-            <p className="text-xs text-slate-500 font-medium">Direct earnings, sales volume, and order performance for the past 7 days.</p>
-          </div>
-          <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 self-start sm:self-auto">
-            +14.5% vs Last Week
-          </span>
-        </div>
-
-        {/* Weekly Metrics 4-Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800">Week Profit / Revenue</span>
-            <p className="text-2xl font-black text-emerald-950">₹45,200</p>
-            <p className="text-[11px] font-semibold text-emerald-700">Direct payouts into bank/UPI</p>
-          </div>
-
-          <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">Week Orders</span>
-            <p className="text-2xl font-black text-amber-950">6 Orders</p>
-            <p className="text-[11px] font-semibold text-amber-700">4 Confirmed • 2 Pending</p>
-          </div>
-
-          <div className="p-4 bg-teal-50/70 border border-teal-200/80 rounded-2xl space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-800">Produce Sold</span>
-            <p className="text-2xl font-black text-teal-950">850 Kg</p>
-            <p className="text-[11px] font-semibold text-teal-700">Red Onion, Tomato & Wheat</p>
-          </div>
-
-          <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Avg Order Value</span>
-            <p className="text-2xl font-black text-slate-900">₹7,533</p>
-            <p className="text-[11px] font-semibold text-slate-500">Per direct buyer transaction</p>
-          </div>
-        </div>
-
-        {/* Weekly Day-by-Day Visual Bar Indicator */}
-        <div className="pt-2">
-          <div className="flex items-center justify-between text-xs font-extrabold text-slate-700 mb-2">
-            <span>Weekly Sales Distribution (Mon - Sun)</span>
-            <span className="text-emerald-700">Peak: Tue (₹14,000)</span>
-          </div>
-          <div className="grid grid-cols-7 gap-2 text-center">
-            {[
-              { day: 'Mon', amount: '₹8.5k', height: 'h-12', active: true },
-              { day: 'Tue', amount: '₹14k', height: 'h-20', active: true },
-              { day: 'Wed', amount: '₹6k', height: 'h-10', active: true },
-              { day: 'Thu', amount: '₹9.2k', height: 'h-14', active: true },
-              { day: 'Fri', amount: '₹7.5k', height: 'h-11', active: true },
-              { day: 'Sat', amount: '₹0', height: 'h-4', active: false },
-              { day: 'Sun', amount: '₹0', height: 'h-4', active: false }
-            ].map((item, idx) => (
-              <div key={idx} className="space-y-1.5 flex flex-col items-center justify-end">
-                <span className="text-[10px] font-bold text-slate-600">{item.amount}</span>
-                <div
-                  className={`w-full rounded-lg transition-all ${
-                    item.active ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-200'
-                  } ${item.height}`}
-                />
-                <span className="text-[10px] font-extrabold text-slate-500">{item.day}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Card>
-
       {/* 4. TWO-COLUMN DASHBOARD SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* LEFT COLUMN (1 col): Quick Farmer Actions */}
@@ -320,7 +247,7 @@ export const FarmerDashboard = () => {
                 >
                   <div className="space-y-1">
                     <p className="text-sm font-black text-slate-900">
-                      Order #{ord.order_id} • {ord.quantity} {ord.unit || 'Kg'} {t(ord.product_name)}
+                      Order #{ord.order_id} • {ord.quantity} {ord.unit || ord.product?.unit || 'Kg'} {t(ord.product_name || ord.product?.product_name || 'Produce')}
                     </p>
                     <p className="text-xs text-slate-500 font-medium">
                       Buyer: {ord.buyer_name} ({ord.buyer_business || 'Wholesale Buyer'}) • Total: ₹{ord.total_amount?.toLocaleString('en-IN')}

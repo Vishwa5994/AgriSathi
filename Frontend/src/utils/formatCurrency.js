@@ -70,3 +70,39 @@ export const getReturnEligibility = (order) => {
     daysLeft
   };
 };
+
+export const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  const rawBase = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://agrisathi-3eew.onrender.com';
+  const cleanBase = rawBase.replace(/\/api\/?$/, '').replace(/\/$/, '');
+  const cleanPath = url.startsWith('/') ? url : `/${url}`;
+  return `${cleanBase}${cleanPath}`;
+};
+
+export const formatBuyerUnitAndPrice = (quantity, pricePerUnit, rawUnit) => {
+  const unitStr = String(rawUnit || 'kg').trim();
+  const isQuintal = /^quintal|qtl$/i.test(unitStr);
+  if (isQuintal) {
+    return {
+      displayQuantity: Number(quantity || 0) * 100,
+      displayPricePerUnit: Number(pricePerUnit || 0) / 100,
+      displayUnit: 'kg'
+    };
+  }
+  return {
+    displayQuantity: Number(quantity || 0),
+    displayPricePerUnit: Number(pricePerUnit || 0),
+    displayUnit: /^quintal|qtl$/i.test(unitStr) ? 'kg' : unitStr
+  };
+};
+
+export const formatBuyerUnit = (rawUnit) => {
+  const unitStr = String(rawUnit || 'kg').trim();
+  if (/^quintal|qtl$/i.test(unitStr)) {
+    return 'kg';
+  }
+  return unitStr;
+};

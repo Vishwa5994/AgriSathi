@@ -79,11 +79,11 @@ export const ProductManagementModal = ({ isOpen, onClose, initialMode = 'add', t
       setMode('edit');
       setSelectedListingId(targetListing.listing_id);
       setSelectedProductId(targetListing.product_id);
-      setQuantity(String(targetListing.quantity || targetListing.available_stock || 50));
+      setQuantity(String(targetListing.quantity ?? targetListing.available_stock ?? 50));
       setAskingPrice(String(targetListing.price_per_unit || 2000));
       setQualityGrade(targetListing.quality_grade || 'Grade A+');
-      setHarvestDate(targetListing.harvest_date || new Date().toISOString().split('T')[0]);
-      setPickupLocation(targetListing.pickup_location || 'Farmgate APMC Yard');
+      setHarvestDate(targetListing.harvest_date ? String(targetListing.harvest_date).split('T')[0] : new Date().toISOString().split('T')[0]);
+      setPickupLocation(targetListing.location || targetListing.pickup_location || 'Farmgate APMC Yard');
     }
   }, [targetListing]);
 
@@ -93,11 +93,11 @@ export const ProductManagementModal = ({ isOpen, onClose, initialMode = 'add', t
     const found = listings.find((l) => l.listing_id === listingId);
     if (found) {
       setSelectedProductId(found.product_id);
-      setQuantity(String(found.quantity || found.available_stock));
-      setAskingPrice(String(found.price_per_unit));
-      setQualityGrade(found.quality_grade);
-      setHarvestDate(found.harvest_date);
-      setPickupLocation(found.pickup_location);
+      setQuantity(String(found.quantity ?? found.available_stock ?? 50));
+      setAskingPrice(String(found.price_per_unit || 2000));
+      setQualityGrade(found.quality_grade || 'Grade A+');
+      setHarvestDate(found.harvest_date ? String(found.harvest_date).split('T')[0] : new Date().toISOString().split('T')[0]);
+      setPickupLocation(found.location || found.pickup_location || 'Farmgate APMC Yard');
     }
   };
 
@@ -146,6 +146,7 @@ export const ProductManagementModal = ({ isOpen, onClose, initialMode = 'add', t
         price_per_unit: Number(askingPrice),
         quality_grade: qualityGrade,
         harvest_date: harvestDate,
+        location: pickupLocation,
         pickup_location: pickupLocation
       };
 

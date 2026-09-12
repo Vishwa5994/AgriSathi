@@ -42,6 +42,7 @@ export const useListings = (initialFilters = {}) => {
 
   const deleteListing = async (listingId) => {
     const res = await listingsApi.deleteListing(listingId);
+    setListings((prev) => prev.filter((l) => String(l.listing_id) !== String(listingId)));
     fetchListings();
     return res;
   };

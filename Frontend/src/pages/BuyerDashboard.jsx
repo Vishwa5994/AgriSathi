@@ -38,9 +38,9 @@ export const BuyerDashboard = () => {
   const { orders, loading: loadingOrders } = useOrders();
 
   // Filter buyer's own orders
-  const buyerOrders = orders.filter(
-    (o) => o.buyer_id === user?.user_id || o.buyer_name === user?.name || true
-  );
+  const buyerOrders = user?.user_id
+    ? orders.filter((o) => Number(o.buyer_id) === Number(user.user_id) || o.buyer_name === user?.name)
+    : orders;
 
   // --- Metrics (mirrors FarmerDashboard stat calculation) ---
   const activeOrdersCount = buyerOrders.filter(
@@ -188,79 +188,6 @@ export const BuyerDashboard = () => {
         </Card>
       </div>
 
-      {/* ── 3. WEEK-WISE SUMMARY SECTION ── */}
-      <Card className="bg-white border-slate-200/90 shadow-sm p-6 space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-[11px] font-bold">
-              <BarChart3 className="w-3.5 h-3.5 text-indigo-600" />
-              This Week's Sourcing Analytics
-            </div>
-            <h2 className="text-lg font-black text-slate-900 mt-1">Week-Wise Summary</h2>
-            <p className="text-xs text-slate-500 font-medium">Weekly spend, order volume, produce sourced, and Mandi cost savings for past 7 days.</p>
-          </div>
-          <span className="text-xs font-extrabold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 self-start sm:self-auto">
-            ₹6,200 Saved This Week
-          </span>
-        </div>
-
-        {/* Weekly Metrics 4-Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 bg-indigo-50/70 border border-indigo-200/80 rounded-2xl space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-800">Week Spend</span>
-            <p className="text-2xl font-black text-indigo-950">₹38,400</p>
-            <p className="text-[11px] font-semibold text-indigo-700">Direct farm-gate purchases</p>
-          </div>
-
-          <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800">Week Orders</span>
-            <p className="text-2xl font-black text-amber-950">4 Orders</p>
-            <p className="text-[11px] font-semibold text-amber-700">3 Completed • 1 Pending</p>
-          </div>
-
-          <div className="p-4 bg-teal-50/70 border border-teal-200/80 rounded-2xl space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-800">Crops Sourced</span>
-            <p className="text-2xl font-black text-teal-950">650 Kg</p>
-            <p className="text-[11px] font-semibold text-teal-700">Hybrid Tomato & Red Onion</p>
-          </div>
-
-          <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-1">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Mandi Savings</span>
-            <p className="text-2xl font-black text-emerald-700">₹6,200</p>
-            <p className="text-[11px] font-semibold text-slate-500">Vs. APMC Mandi wholesale rate</p>
-          </div>
-        </div>
-
-        {/* Weekly Day-by-Day Visual Bar Indicator */}
-        <div className="pt-2">
-          <div className="flex items-center justify-between text-xs font-extrabold text-slate-700 mb-2">
-            <span>Weekly Sourcing Spend (Mon - Sun)</span>
-            <span className="text-indigo-700">Peak: Tue (₹14,000)</span>
-          </div>
-          <div className="grid grid-cols-7 gap-2 text-center">
-            {[
-              { day: 'Mon', amount: '₹10k', height: 'h-14', active: true },
-              { day: 'Tue', amount: '₹14k', height: 'h-20', active: true },
-              { day: 'Wed', amount: '₹4k', height: 'h-8', active: true },
-              { day: 'Thu', amount: '₹10.4k', height: 'h-15', active: true },
-              { day: 'Fri', amount: '₹0', height: 'h-4', active: false },
-              { day: 'Sat', amount: '₹0', height: 'h-4', active: false },
-              { day: 'Sun', amount: '₹0', height: 'h-4', active: false }
-            ].map((item, idx) => (
-              <div key={idx} className="space-y-1.5 flex flex-col items-center justify-end">
-                <span className="text-[10px] font-bold text-slate-600">{item.amount}</span>
-                <div
-                  className={`w-full rounded-lg transition-all ${
-                    item.active ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-200'
-                  } ${item.height}`}
-                />
-                <span className="text-[10px] font-extrabold text-slate-500">{item.day}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Card>
-
       {/* ── 4. MAIN DASHBOARD SECTION ── */}
       <div className="grid grid-cols-1 gap-6 items-start">
 
@@ -321,7 +248,7 @@ export const BuyerDashboard = () => {
                   >
                     <div className="space-y-1">
                       <p className="text-sm font-black text-slate-900">
-                        Order #{ord.order_id} • {ord.quantity} {ord.unit || 'Kg'} {t(ord.product_name)}
+                        Order #{ord.order_id} • {ord.quantity} {ord.unit || ord.product?.unit || 'Kg'} {t(ord.product_name || ord.product?.product_name || 'Produce')}
                       </p>
                       <p className="text-xs text-slate-500 font-medium">
                         Farmer: {ord.farmer_name} • Total: ₹{ord.total_amount?.toLocaleString('en-IN')}

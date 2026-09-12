@@ -10,6 +10,7 @@ import { Breadcrumbs } from './components/Breadcrumbs';
 import { Footer } from './components/Footer';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ChatAssistant } from './components/ChatAssistant';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Pages
 import { Landing } from './pages/Landing';
@@ -63,94 +64,96 @@ const AnimatedRoutes = () => {
         transition={{ duration: 0.25, ease: 'easeInOut' }}
         className="flex-1"
       >
-        <Routes location={location}>
-          <Route path="/" element={<HomeRoute />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route
-            path="/farmer-dashboard"
-            element={
-              <ProtectedRoute requiredRole="FARMER">
-                <FarmerDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/my-products"
-            element={
-              <ProtectedRoute requiredRole="FARMER">
-                <MyProducts />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/add-product"
-            element={
-              <ProtectedRoute requiredRole="FARMER">
-                <AddProduct />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/buyer-dashboard"
-            element={
-              <ProtectedRoute requiredRole="BUYER">
-                <BuyerDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/marketplace" element={<BuyerMarketplace />} />
-          <Route
-            path="/buyer-orders"
-            element={
-              <ProtectedRoute requiredRole="BUYER">
-                <BuyerOrders />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/orders"
-            element={
-              <ProtectedRoute>
-                <OrdersRoute />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/order-payment"
-            element={
-              <ProtectedRoute>
-                <OrderPayment />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/price-discovery" element={<PriceDiscovery />} />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute requiredRole="FARMER">
-                <FarmerDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/notifications"
-            element={
-              <ProtectedRoute>
-                <Notifications />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin-dashboard"
-            element={
-              <ProtectedRoute requiredRole="ADMIN">
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <ErrorBoundary key={location.pathname}>
+          <Routes location={location}>
+            <Route path="/" element={<HomeRoute />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route
+              path="/farmer-dashboard"
+              element={
+                <ProtectedRoute requiredRole="FARMER">
+                  <FarmerDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-products"
+              element={
+                <ProtectedRoute requiredRole="FARMER">
+                  <MyProducts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/add-product"
+              element={
+                <ProtectedRoute requiredRole="FARMER">
+                  <AddProduct />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buyer-dashboard"
+              element={
+                <ProtectedRoute requiredRole="BUYER">
+                  <BuyerDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/marketplace" element={<BuyerMarketplace />} />
+            <Route
+              path="/buyer-orders"
+              element={
+                <ProtectedRoute requiredRole="BUYER">
+                  <BuyerOrders />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute>
+                  <OrdersRoute />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/order-payment"
+              element={
+                <ProtectedRoute>
+                  <OrderPayment />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/price-discovery" element={<PriceDiscovery />} />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute requiredRole="FARMER">
+                  <FarmerDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute>
+                  <Notifications />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin-dashboard"
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </ErrorBoundary>
       </motion.div>
     </AnimatePresence>
   );

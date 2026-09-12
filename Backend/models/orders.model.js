@@ -3,7 +3,7 @@ const db = require("../config/db");
 async function getAll(filters = {}) {
     try {
         let query = `
-            SELECT o.*, l.farmer_id, l.product_id, p.product_name, 
+            SELECT o.*, l.farmer_id, l.product_id, l.location as pickup_location, p.product_name, p.category, p.unit, p.picture, 
                    u_buyer.name as buyer_name, u_buyer.phone as buyer_phone,
                    u_farmer.name as farmer_name, u_farmer.phone as farmer_phone
             FROM orders o
@@ -46,7 +46,7 @@ async function getAll(filters = {}) {
 async function getById(id) {
     try {
         const [data] = await db.query(`
-            SELECT o.*, l.farmer_id, l.product_id, p.product_name, 
+            SELECT o.*, l.farmer_id, l.product_id, l.location as pickup_location, p.product_name, p.category, p.unit, p.picture, 
                    u_buyer.name as buyer_name, u_buyer.phone as buyer_phone,
                    u_farmer.name as farmer_name, u_farmer.phone as farmer_phone
             FROM orders o
@@ -66,7 +66,7 @@ async function getById(id) {
 async function getByBuyerId(buyerId) {
     try {
         const [data] = await db.query(`
-            SELECT o.*, p.product_name, u_farmer.name as farmer_name
+            SELECT o.*, l.location as pickup_location, p.product_name, p.category, p.unit, p.picture, u_farmer.name as farmer_name
             FROM orders o
             JOIN listings l ON o.listing_id = l.listing_id
             JOIN products p ON l.product_id = p.product_id

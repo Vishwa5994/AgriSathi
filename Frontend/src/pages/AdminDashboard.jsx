@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { listingsApi } from '../api/listingsApi';
 import { ordersApi } from '../api/ordersApi';
+import apiClient from '../api/client';
 import {
   ShieldCheck,
   Users,
@@ -33,7 +34,7 @@ import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const AdminDashboard = () => {
-  const { user } = useAuth();
+  const { user, switchDemoRole } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -64,15 +65,30 @@ export const AdminDashboard = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const storedUsersRaw = localStorage.getItem('agri_users');
-      const uList = storedUsersRaw ? JSON.parse(storedUsersRaw) : [];
-      setUsersList(uList);
+      // 1. Fetch real users from /users API
+      let uList = [];
+      try {
+        const uRes = await apiClient.get('/users');
+        uList = uRes.data?.data || uRes.data || [];
+      } catch (err) {
+        const storedUsersRaw = localStorage.getItem('agri_users');
+        uList = storedUsersRaw ? JSON.parse(storedUsersRaw) : [];
+      }
+      setUsersList(Array.isArray(uList) ? uList : []);
 
+      // 2. Fetch real listings from /listings API
       const lList = await listingsApi.getListings();
       setListingsList(lList || []);
 
-      const oList = await ordersApi.getMine();
-      setOrdersList(oList || []);
+      // 3. Fetch real orders from /orders API
+      let oList = [];
+      try {
+        const oRes = await apiClient.get('/orders');
+        oList = oRes.data?.data || oRes.data || [];
+      } catch (err) {
+        oList = await ordersApi.getMine();
+      }
+      setOrdersList(Array.isArray(oList) ? oList : []);
     } catch (e) {
       toast.error('Failed to load admin records');
     } finally {

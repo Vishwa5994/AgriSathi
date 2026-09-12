@@ -45,7 +45,7 @@ export const MyProducts = () => {
   const initialView = searchParams.get('view') === 'table' ? 'table' : 'photos';
   const [viewMode, setViewMode] = useState(initialView); // 'photos' | 'table'
 
-  const { listings, loading, deleteListing, refetch } = useListings({
+  const { listings, loading, error, deleteListing, refetch } = useListings({
     farmer_id: user?.user_id
   });
 
@@ -209,7 +209,20 @@ export const MyProducts = () => {
       </Card>
 
       {/* CONTENT AREA: PHOTOS GRID vs TABLE VIEW */}
-      {loading ? (
+      {error ? (
+        <Card className="p-8 text-center space-y-4 bg-white border-slate-200">
+          <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 mx-auto flex items-center justify-center font-bold text-lg">
+            !
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-black text-slate-800">Failed to load your products</h3>
+            <p className="text-xs text-slate-500 font-medium">{error}</p>
+          </div>
+          <Button variant="primary" size="md" onClick={refetch} className="bg-emerald-600 hover:bg-emerald-700">
+            Retry Loading
+          </Button>
+        </Card>
+      ) : loading ? (
         <Card className="p-6">
           <SkeletonLoader type="card" count={4} />
         </Card>
@@ -239,7 +252,7 @@ export const MyProducts = () => {
               {/* Product Photo */}
               <div className="relative aspect-4/3 overflow-hidden bg-slate-100">
                 <ProductImage
-                  src={item.image_url}
+                  src={item.picture || item.image_url}
                   alt={item.product_name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   iconClassName="w-10 h-10 text-slate-400"
@@ -269,7 +282,7 @@ export const MyProducts = () => {
                     {t(item.product_name)}
                   </h3>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                    Stock: <strong className="text-slate-800">{item.available_stock || item.quantity} {t(item.unit)}</strong>
+                    Stock: <strong className="text-slate-800">{item.quantity ?? item.available_stock ?? 0} {t(item.unit)}</strong>
                   </p>
                 </div>
 
@@ -279,13 +292,23 @@ export const MyProducts = () => {
                     <span className="truncate">{item.pickup_location}</span>
                   </div>
 
-                  <button
-                    onClick={() => navigate(`/add-product?edit=${item.listing_id}`)}
-                    className="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 font-bold rounded-lg text-[11px] transition-colors flex items-center gap-1 cursor-pointer shrink-0"
-                  >
-                    <Edit3 className="w-3 h-3" />
-                    Edit
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => navigate(`/add-product?edit=${item.listing_id}`)}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 font-bold rounded-lg text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.listing_id)}
+                      disabled={deletingId === item.listing_id}
+                      className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-[11px] transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -316,7 +339,7 @@ export const MyProducts = () => {
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
                         <ProductImage
-                          src={item.image_url}
+                          src={item.picture || item.image_url}
                           alt={item.product_name}
                           className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-100"
                           iconClassName="w-5 h-5 text-slate-400"
@@ -339,7 +362,7 @@ export const MyProducts = () => {
 
                     {/* Available Stock */}
                     <td className="py-3.5 px-4 font-black text-slate-900">
-                      {item.available_stock || item.quantity} {t(item.unit)}
+                      {item.quantity ?? item.available_stock ?? 0} {t(item.unit)}
                     </td>
 
                     {/* Asking Price */}

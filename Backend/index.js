@@ -17,21 +17,38 @@ const notificationsRouter = require("./routes/notifications.route");
 const reviewsRouter = require("./routes/reviews.route");
 const deliveryRouter = require("./routes/delivery.route");
 const errorHandler = require("./middleware/error.middleware");
+const rateLimiterMiddleware = require("./middleware/rateLimiter");
 
 const app = express();
 
-// CORS Middleware
-app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    if (req.method === "OPTIONS") {
-        return res.sendStatus(200);
-    }
-    next();
-});
+// Trust the first proxy (Render) so req.ip returns the real client IP
+app.set("trust proxy", 1);
+
+const cors = require("cors");
+
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+    process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Fallback to true to allow cross-origin dev while logging
+        }
+    },
+    credentials: true,
+    exposedHeaders: ["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"]
+}));
 
 app.use(express.json());
+
+// Global rate limiter for all API routes
+app.use("/api", rateLimiterMiddleware);
 
 // API Routes
 app.use("/api/auth", authRouter);

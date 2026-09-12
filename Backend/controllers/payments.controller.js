@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const paymentsModel = require("../models/payments.model");
 const ordersModel = require("../models/orders.model");
+const listingsModel = require("../models/listings.model");
 const notificationsModel = require("../models/notifications.model");
 
 async function getAllPayments(req, res) {
@@ -45,6 +46,15 @@ async function createPayment(req, res) {
     const status = payment_status || 'PENDING';
     const paidAt = status === 'PAID' ? new Date() : null;
 
+    // Cleanly map payment_method to valid MySQL ENUM ('UPI', 'CASH', 'BANK_TRANSFER')
+    let mappedMethod = String(payment_method).toUpperCase();
+    if (['RAZORPAY', 'CARD', 'NETBANKING', 'BANK'].includes(mappedMethod)) {
+        mappedMethod = 'BANK_TRANSFER';
+    }
+    if (!['UPI', 'CASH', 'BANK_TRANSFER'].includes(mappedMethod)) {
+        mappedMethod = 'UPI';
+    }
+
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
@@ -52,7 +62,7 @@ async function createPayment(req, res) {
         const result = await paymentsModel.insert({
             order_id,
             amount,
-            payment_method,
+            payment_method: mappedMethod,
             payment_status: status,
             transaction_id: transaction_id || null,
             paid_at: paidAt
@@ -61,10 +71,14 @@ async function createPayment(req, res) {
         const paymentId = result.insertId;
 
         if (status === 'PAID') {
+            await ordersModel.updateStatus(order_id, 'CONFIRMED', connection);
+            if (order.listing_id) {
+                await listingsModel.updateStatus(order.listing_id, 'SOLD', connection);
+            }
             await notificationsModel.insert({
                 user_id: order.farmer_id,
                 title: "Payment Received",
-                message: `Payment of ₹${amount} via ${payment_method} for Order #${order_id} has been marked as PAID.`
+                message: `Payment of ₹${amount} via ${mappedMethod} for Order #${order_id} has been marked as PAID.`
             }, connection);
         }
 
@@ -72,7 +86,7 @@ async function createPayment(req, res) {
 
         return res.status(201).send({
             error: false,
-            data: { payment_id: paymentId, order_id, amount, payment_method, payment_status: status },
+            data: { payment_id: paymentId, order_id, amount, payment_method: mappedMethod, payment_status: status },
             message: "Payment record created successfully"
         });
     } catch (err) {
@@ -106,6 +120,10 @@ async function updatePaymentStatus(req, res) {
         await paymentsModel.updateStatus(paymentId, payment_status, transaction_id, connection);
 
         if (payment_status === 'PAID' && order) {
+            await ordersModel.updateStatus(order.order_id, 'CONFIRMED', connection);
+            if (order.listing_id) {
+                await listingsModel.updateStatus(order.listing_id, 'SOLD', connection);
+            }
             await notificationsModel.insert({
                 user_id: order.farmer_id,
                 title: "Payment Received",
