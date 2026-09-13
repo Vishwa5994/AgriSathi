@@ -8,12 +8,15 @@ import { Button } from '../components/Button';
 import { StatCounter } from '../components/StatCounter';
 import { SkeletonLoader } from '../components/SkeletonLoader';
 import { formatCurrency } from '../utils/formatCurrency';
+import { MarketPredictionChart } from '../components/MarketPredictionChart';
+import { predictionApi } from '../api/predictionApi';
 import {
   ShoppingBag,
   MapPin,
   Clock,
   CheckCircle2,
   TrendingDown,
+  TrendingUp,
   UserCheck,
   Search,
   Package,
@@ -21,7 +24,8 @@ import {
   IndianRupee,
   RefreshCw,
   BadgeCheck,
-  Tag
+  Tag,
+  Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -33,6 +37,19 @@ export const BuyerDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // ML Commodity Sourcing Price Prediction
+  const [selectedCommodity, setSelectedCommodity] = useState('Tomato');
+  const [commodityPrediction, setCommodityPrediction] = useState(null);
+  const [loadingCommodityPred, setLoadingCommodityPred] = useState(false);
+
+  useEffect(() => {
+    setLoadingCommodityPred(true);
+    predictionApi.predictPrice(selectedCommodity, 4)
+      .then((data) => setCommodityPrediction(data))
+      .catch(() => setCommodityPrediction(null))
+      .finally(() => setLoadingCommodityPred(false));
+  }, [selectedCommodity]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -318,6 +335,56 @@ export const BuyerDashboard = () => {
           )}
         </Card>
       </div>
+
+      {/* 5. ML SOURCING PRICE INTELLIGENCE GRAPH */}
+      <Card className="bg-white border-slate-200/90 shadow-sm p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold shadow-xs">
+              <Sparkles className="w-5 h-5 text-indigo-600 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900 tracking-tight">
+                AI Wholesale Sourcing Price Intelligence (XGBoost)
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Procurement price trajectory & next-quarter cost forecasting
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedCommodity}
+              onChange={(e) => setSelectedCommodity(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+            >
+              {['Tomato', 'Onion', 'Potato', 'Wheat', 'Rice', 'Maize', 'Mustard', 'Gram'].map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/price-discovery')}
+              className="text-xs font-bold border-slate-200 rounded-xl"
+            >
+              Full Price Discovery
+            </Button>
+          </div>
+        </div>
+
+        <MarketPredictionChart
+          type="price"
+          historicalData={commodityPrediction?.historical}
+          forecastData={commodityPrediction?.forecast}
+          commodityName={selectedCommodity}
+          unit="₹/Qtl"
+          height={260}
+          loading={loadingCommodityPred}
+        />
+      </Card>
     </div>
   );
 };

@@ -10,6 +10,8 @@ import { StatCounter } from '../components/StatCounter';
 import { SkeletonLoader } from '../components/SkeletonLoader';
 import { formatCurrency, formatDate } from '../utils/formatCurrency';
 import { ProductManagementModal } from '../components/ProductManagementModal';
+import { MarketPredictionChart } from '../components/MarketPredictionChart';
+import { predictionApi } from '../api/predictionApi';
 import {
   Package,
   Clock,
@@ -21,7 +23,8 @@ import {
   ArrowRight,
   RefreshCw,
   Star,
-  Scale
+  Scale,
+  Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -35,6 +38,19 @@ export const FarmerDashboard = () => {
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [targetEditListing, setTargetEditListing] = useState(null);
+
+  // ML Model Forecast State
+  const [selectedCrop, setSelectedCrop] = useState('Wheat');
+  const [cropPrediction, setCropPrediction] = useState(null);
+  const [loadingPred, setLoadingPred] = useState(false);
+
+  useEffect(() => {
+    setLoadingPred(true);
+    predictionApi.predictPrice(selectedCrop, 4)
+      .then((data) => setCropPrediction(data))
+      .catch(() => setCropPrediction(null))
+      .finally(() => setLoadingPred(false));
+  }, [selectedCrop]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -364,6 +380,56 @@ export const FarmerDashboard = () => {
           )}
         </Card>
       </div>
+
+      {/* 5. ML PRICE FORECAST & MARKET INTELLIGENCE GRAPH */}
+      <Card className="bg-white border-slate-200/90 shadow-sm p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-xs">
+              <Sparkles className="w-5 h-5 text-emerald-600 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900 tracking-tight">
+                AI Mandi Price Forecast (XGBoost Model)
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Recursive 4-month market prediction trained on historical APMC arrivals & prices
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedCrop}
+              onChange={(e) => setSelectedCrop(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+            >
+              {['Wheat', 'Onion', 'Tomato', 'Potato', 'Maize', 'Mustard', 'Soyabean', 'Gram', 'Rice'].map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/price-discovery')}
+              className="text-xs font-bold border-slate-200 rounded-xl"
+            >
+              Full Analytics
+            </Button>
+          </div>
+        </div>
+
+        <MarketPredictionChart
+          type="price"
+          historicalData={cropPrediction?.historical}
+          forecastData={cropPrediction?.forecast}
+          commodityName={selectedCrop}
+          unit="₹/Qtl"
+          height={260}
+          loading={loadingPred}
+        />
+      </Card>
 
       {/* UNIFIED PRODUCT MANAGEMENT MODAL */}
       <ProductManagementModal

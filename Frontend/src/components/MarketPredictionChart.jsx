@@ -14,14 +14,45 @@ import { TrendingUp, Sparkles, AlertCircle } from 'lucide-react';
 
 export const MarketPredictionChart = ({
   historical = [],
+  historicalData = [],
   forecast = [],
+  forecastData = [],
   commodityName = '',
   unit = '₹/Qtl',
   type = 'price', // 'price' | 'demand'
-  height = 240,
-  compact = false
+  height = 260,
+  compact = false,
+  loading = false,
+  error = null
 }) => {
-  if ((!historical || historical.length === 0) && (!forecast || forecast.length === 0)) {
+  const actualHistorical = (historical && historical.length > 0) ? historical : (historicalData || []);
+  const actualForecast = (forecast && forecast.length > 0) ? forecast : (forecastData || []);
+
+  if (loading) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center p-6 bg-slate-50 border border-slate-200 rounded-2xl text-slate-400 text-xs text-center animate-pulse"
+        style={{ height }}
+      >
+        <Sparkles className="w-6 h-6 mb-2 text-emerald-500 animate-spin" />
+        <span className="font-semibold text-slate-600">Computing XGBoost ML Forecast...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center p-6 bg-rose-50 border border-rose-200 rounded-2xl text-rose-600 text-xs text-center"
+        style={{ height }}
+      >
+        <AlertCircle className="w-6 h-6 mb-1.5 text-rose-500" />
+        <span className="font-bold">{error}</span>
+      </div>
+    );
+  }
+
+  if ((!actualHistorical || actualHistorical.length === 0) && (!actualForecast || actualForecast.length === 0)) {
     return (
       <div
         className="flex flex-col items-center justify-center p-6 bg-slate-50 border border-slate-200 rounded-2xl text-slate-400 text-xs text-center"
@@ -37,17 +68,17 @@ export const MarketPredictionChart = ({
   // Connect the last historical point with the first forecast point for smooth continuity
   const chartData = [];
 
-  historical.forEach((item, idx) => {
+  actualHistorical.forEach((item, idx) => {
     const val = type === 'price' ? item.avg_modal_price : item.demand;
     chartData.push({
       month: item.month,
       historical: val,
-      forecast: idx === historical.length - 1 ? val : null, // Bridge point
+      forecast: idx === actualHistorical.length - 1 ? val : null, // Bridge point
       isForecast: false,
     });
   });
 
-  forecast.forEach((item) => {
+  actualForecast.forEach((item) => {
     const val = type === 'price' ? item.predicted_price : item.predicted_demand;
     chartData.push({
       month: item.month,
