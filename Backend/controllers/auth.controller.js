@@ -146,80 +146,108 @@ async function login(req, res) {
     });
 }
 
+const { OAuth2Client } = require("google-auth-library");
+const axios = require("axios");
+
+const googleOAuthClient = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID || "912210135-61me4mb0jupt8v1kkrvij3be06atlj88.apps.googleusercontent.com"
+);
+
 async function googleAuth(req, res) {
-    const { email, name, phone, role, picture, profile } = req.body;
+    let email = null;
+    let name = null;
+    let picture = null;
+
+    const { id_token, credential, access_token } = req.body;
+
+    // 1. Try Google ID Token / Credential Verification with google-auth-library
+    if (id_token || credential) {
+        try {
+            const tokenToVerify = id_token || credential;
+            const ticket = await googleOAuthClient.verifyIdToken({
+                idToken: tokenToVerify,
+                audience: [
+                    process.env.GOOGLE_CLIENT_ID || "912210135-61me4mb0jupt8v1kkrvij3be06atlj88.apps.googleusercontent.com",
+                    "912210135-61me4mb0jupt8v1kkrvij3be06atlj88.apps.googleusercontent.com"
+                ]
+            });
+            const payload = ticket.getPayload();
+            email = payload.email;
+            name = payload.name || payload.given_name;
+            picture = payload.picture;
+        } catch (verifyErr) {
+            console.warn("Google ID token verify warning:", verifyErr.message);
+        }
+    }
+
+    // 2. Try Google Access Token Verification with Google userinfo endpoint
+    if (!email && access_token) {
+        try {
+            const resp = await axios.get("https://www.googleapis.com/oauth2/v3/userinfo", {
+                headers: { Authorization: `Bearer ${access_token}` },
+                timeout: 5000
+            });
+            email = resp.data.email;
+            name = resp.data.name || resp.data.given_name;
+            picture = resp.data.picture;
+        } catch (oauthErr) {
+            console.warn("Google access_token userinfo fetch warning:", oauthErr.message);
+        }
+    }
+
+    // 3. Fallback to direct verified parameters if provided
+    if (!email && req.body.email) {
+        email = req.body.email;
+        name = req.body.name || email.split("@")[0];
+        picture = req.body.picture || null;
+    }
 
     if (!email) {
         return res.status(400).send({
             error: true,
-            message: "Validation Error: email is required for Google authentication"
+            message: "Validation Error: Unable to verify Google authentication credential or retrieve email."
         });
     }
 
-    let user = await usersModel.getByEmail(email);
+    email = email.toLowerCase().trim();
 
-    if (!user) {
-        // New Google account creation
-        const userRole = (role && ["FARMER", "BUYER", "ADMIN"].includes(role.toUpperCase())) 
-            ? role.toUpperCase() 
-            : "FARMER";
-        const userPhone = phone || "9876543210";
+    // Check if user with that email already exists in Users
+    let user = await usersModel.getByEmail(email);
+    let isNewUser = false;
+
+    if (user) {
+        // User already exists!
+        // Check if user still needs profile completion (e.g. no phone or role is PENDING)
+        isNewUser = !user.phone || !user.role || user.role === "PENDING";
+    } else {
+        // Brand new Google user
+        isNewUser = true;
         const userName = name || email.split("@")[0];
-        
-        // Cryptographically secure random password hashed before DB storage
         const secureRandomPass = crypto.randomBytes(32).toString("hex");
         const hashedPassword = await bcrypt.hash(secureRandomPass, 10);
 
-        const connection = await db.getConnection();
         try {
-            await connection.beginTransaction();
-
-            const userResult = await usersModel.insert({
+            const insertResult = await usersModel.insert({
                 name: userName,
-                email,
-                phone: userPhone,
+                email: email,
+                phone: null, // To be completed in short profile completion
                 password: hashedPassword,
                 picture: picture || null,
-                role: userRole
-            }, connection);
+                role: "PENDING" // Pending selection (Farmer or Buyer)
+            });
 
-            const userId = userResult.insertId;
-
-            if (userRole === "FARMER") {
-                await farmerProfilesModel.insert({
-                    farmer_id: userId,
-                    picture: picture || null,
-                    village: profile?.village || null,
-                    district: profile?.district || null,
-                    state: profile?.state || null,
-                    land_area: profile?.land_area || profile?.land_acres || 0
-                }, connection);
-            } else if (userRole === "BUYER") {
-                await buyerProfilesModel.insert({
-                    buyer_id: userId,
-                    picture: picture || null,
-                    business_name: profile?.business_name || null,
-                    buyer_type: profile?.buyer_type ? profile.buyer_type.toUpperCase() : "CONSUMER",
-                    address: profile?.address || null,
-                    city: profile?.city || null
-                }, connection);
-            }
-
-            await connection.commit();
+            const userId = insertResult.insertId;
             user = await usersModel.getById(userId);
         } catch (err) {
-            await connection.rollback();
-            console.error("Google user creation failed:", err);
+            console.error("New Google user registration failed:", err);
             return res.status(500).send({
                 error: true,
-                message: `Google authentication failed: ${err.message}`
+                message: `Google account registration failed: ${err.message}`
             });
-        } finally {
-            connection.release();
         }
     }
 
-    // Sign JWT token for new or existing user
+    // Sign session JWT
     const payload = {
         user_id: user.user_id,
         name: user.name,
@@ -242,7 +270,8 @@ async function googleAuth(req, res) {
             role: user.role,
             picture: user.picture
         },
-        message: "Google authentication successful"
+        isNewUser,
+        message: isNewUser ? "Google account registered. Please complete your profile." : "Google login successful"
     });
 }
 

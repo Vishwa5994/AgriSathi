@@ -32,7 +32,8 @@ async function getByEmail(email) {
 
 async function insert(userData, client = db) {
     try {
-        const { name, email, phone, password, picture, role } = userData;
+        const { name, email, password, picture, role } = userData;
+        const phoneVal = userData.phone ? (Number(String(userData.phone).replace(/[^0-9]/g, '')) || null) : null;
 
         let user_id = userData.user_id;
         if (!user_id) {
@@ -42,7 +43,7 @@ async function insert(userData, client = db) {
 
         const [result] = await client.query(
             "INSERT INTO users (user_id, name, email, phone, password, picture, role) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [user_id, name, email, phone, password, picture || null, role]
+            [user_id, name, email, phoneVal, password, picture || null, role]
         );
         if (!result.insertId) {
             result.insertId = user_id;
@@ -56,10 +57,35 @@ async function insert(userData, client = db) {
 
 async function update(id, userData) {
     try {
-        const { name, phone, picture } = userData;
+        const fields = [];
+        const params = [];
+
+        if (userData.name !== undefined) {
+            fields.push("name = ?");
+            params.push(userData.name);
+        }
+        if (userData.phone !== undefined) {
+            const cleanPhone = userData.phone ? (Number(String(userData.phone).replace(/[^0-9]/g, '')) || null) : null;
+            fields.push("phone = ?");
+            params.push(cleanPhone);
+        }
+        if (userData.picture !== undefined) {
+            fields.push("picture = ?");
+            params.push(userData.picture || null);
+        }
+        if (userData.role !== undefined) {
+            fields.push("role = ?");
+            params.push(userData.role);
+        }
+
+        if (fields.length === 0) {
+            return { affectedRows: 0 };
+        }
+
+        params.push(id);
         const [result] = await db.query(
-            "UPDATE users SET name = ?, phone = ?, picture = ? WHERE user_id = ?",
-            [name, phone, picture || null, id]
+            `UPDATE users SET ${fields.join(", ")} WHERE user_id = ?`,
+            params
         );
         return result;
     } catch (err) {

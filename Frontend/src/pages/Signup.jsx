@@ -10,6 +10,8 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { GoogleIcon } from './Login';
 import { GoogleProfileCompletionModal } from '../components/GoogleProfileCompletionModal';
+import { authApi } from '../api/authApi';
+import { triggerGoogleAuth } from '../utils/googleAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const signupSchema = z.object({
@@ -55,15 +57,15 @@ export const Signup = () => {
       email: '',
       phone: '',
       password: '',
-      village: 'Pimpalgaon',
-      district: 'Nashik',
-      state: 'Maharashtra',
-      land_area: '5 Acres',
-      upi_id: 'myfarmer@upi',
-      business_name: 'Green Grocers & Supplies',
+      village: '',
+      district: '',
+      state: '',
+      land_area: '',
+      upi_id: '',
+      business_name: '',
       buyer_type: 'Wholesaler',
-      address: 'APMC Grain Market Yard',
-      city: 'Mumbai'
+      address: '',
+      city: ''
     }
   });
 
@@ -72,12 +74,42 @@ export const Signup = () => {
     setValue('role', role);
   };
 
-  const handleGoogleRedirect = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '912210135-61me4mb0jupt8v1kkrvij3be06atlj88.apps.googleusercontent.com';
-    const redirectUri = `${window.location.origin}/signup`;
-    const state = encodeURIComponent(JSON.stringify({ role: selectedRole }));
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile&state=${state}&prompt=select_account`;
-    window.location.href = googleAuthUrl;
+  const navigateBasedOnRole = (role) => {
+    if (role === 'ADMIN') {
+      navigate('/admin-dashboard');
+    } else if (role === 'FARMER') {
+      navigate('/farmer-dashboard');
+    } else if (role === 'BUYER') {
+      navigate('/buyer-dashboard');
+    } else {
+      navigate('/marketplace');
+    }
+  };
+
+  const handleGoogleCallback = (authPayload) => {
+    loginWithGoogle(authPayload)
+      .then((res) => {
+        const user = res.user || res;
+        const isNewUser = res.isNewUser || user.role === 'PENDING' || !user.phone;
+
+        if (isNewUser) {
+          setPendingGoogleUser(user);
+          setIsProfileCompletionOpen(true);
+        } else {
+          navigateBasedOnRole(user.role);
+        }
+      })
+      .catch((err) => {
+        console.error('Google sign in error:', err);
+      });
+  };
+
+  const handleGoogleSignUp = () => {
+    triggerGoogleAuth({
+      onSuccess: (authPayload) => handleGoogleCallback(authPayload),
+      onError: (err) => console.error('Google signup error:', err),
+      selectRole: selectedRole
+    });
   };
 
   // Automated Google OAuth Redirect Callback Handler
@@ -91,50 +123,25 @@ export const Signup = () => {
         return;
       }
       const accessToken = params.get('access_token');
-      const stateRaw = params.get('state');
-      let role = selectedRole;
-      try {
-        if (stateRaw) {
-          const parsedState = JSON.parse(decodeURIComponent(stateRaw));
-          if (parsedState?.role) role = parsedState.role;
-        }
-      } catch (e) {
-        console.error('Failed to parse OAuth state', e);
-      }
+      const idToken = params.get('id_token');
 
-      if (accessToken) {
-        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        })
-          .then((res) => res.json())
-          .then(async (googleUser) => {
-            window.history.replaceState(null, null, window.location.pathname);
-            if (googleUser.email) {
-              setPendingGoogleUser({
-                email: googleUser.email,
-                name: googleUser.name || googleUser.given_name,
-                role: role,
-                picture: googleUser.picture
-              });
-              setIsProfileCompletionOpen(true);
-            }
-          })
-          .catch((err) => {
-            console.error('Google userinfo fetch failed:', err);
-            window.history.replaceState(null, null, window.location.pathname);
-          });
+      window.history.replaceState(null, null, window.location.pathname);
+
+      if (accessToken || idToken) {
+        handleGoogleCallback({ access_token: accessToken, id_token: idToken });
       }
     }
   }, [navigate]);
 
-  const handleCompleteGoogleProfile = async (fullUserData) => {
+  const handleCompleteGoogleProfile = async ({ role, phone }) => {
     try {
-      const user = await loginWithGoogle(fullUserData);
+      if (!pendingGoogleUser?.user_id) return;
+      const updatedUser = await authApi.updateUser(pendingGoogleUser.user_id, { role, phone });
       setIsProfileCompletionOpen(false);
-      if (user.role === 'FARMER') navigate('/farmer-dashboard');
-      else navigate('/buyer-dashboard');
+      setPendingGoogleUser(null);
+      navigateBasedOnRole(updatedUser?.role || role);
     } catch (e) {
-      console.error(e);
+      console.error('Failed to complete Google profile:', e);
     }
   };
 
@@ -142,17 +149,17 @@ export const Signup = () => {
     const profile =
       selectedRole === 'FARMER'
         ? {
-            village: data.village || 'Pimpalgaon',
-            district: data.district || 'Nashik',
-            state: data.state || 'Maharashtra',
-            land_area: data.land_area || '5 Acres',
-            upi_id: data.upi_id || 'farmer@upi'
+            village: data.village || '',
+            district: data.district || '',
+            state: data.state || '',
+            land_area: data.land_area || '',
+            upi_id: data.upi_id || ''
           }
         : {
-            business_name: data.business_name || 'Agri Sourcing Co.',
+            business_name: data.business_name || '',
             buyer_type: data.buyer_type || 'Wholesaler',
-            address: data.address || 'Market Yard Gate 1',
-            city: data.city || 'Mumbai'
+            address: data.address || '',
+            city: data.city || ''
           };
 
     try {
@@ -219,7 +226,7 @@ export const Signup = () => {
           <div className="space-y-3">
             <button
               type="button"
-              onClick={() => handleGoogleRedirect()}
+              onClick={handleGoogleSignUp}
               className="w-full py-3 px-4 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl border border-slate-300 shadow-sm flex items-center justify-center gap-3 transition-all hover:shadow-md cursor-pointer group"
             >
               <GoogleIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
@@ -244,7 +251,6 @@ export const Signup = () => {
                 </label>
                 <input
                   {...register('name')}
-                  placeholder="e.g. Ramesh Kumar Patel"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
                 {errors.name && (
@@ -258,7 +264,6 @@ export const Signup = () => {
                 </label>
                 <input
                   {...register('phone')}
-                  placeholder="+91 98765 43210"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
                 {errors.phone && (
@@ -277,7 +282,6 @@ export const Signup = () => {
                 <input
                   {...register('email')}
                   type="email"
-                  placeholder="name@agrimarket.in"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
                 {errors.email && (
@@ -294,7 +298,6 @@ export const Signup = () => {
                 <input
                   {...register('password')}
                   type="password"
-                  placeholder="••••••••"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
                 {errors.password && (
@@ -317,7 +320,6 @@ export const Signup = () => {
                     <label className="block text-xs font-semibold text-slate-600 mb-1">{t('Village')}</label>
                     <input
                       {...register('village')}
-                      placeholder="Pimpalgaon"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                     />
                   </div>
@@ -325,7 +327,6 @@ export const Signup = () => {
                     <label className="block text-xs font-semibold text-slate-600 mb-1">{t('District')}</label>
                     <input
                       {...register('district')}
-                      placeholder="Nashik"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                     />
                   </div>
@@ -333,7 +334,6 @@ export const Signup = () => {
                     <label className="block text-xs font-semibold text-slate-600 mb-1">{t('State')}</label>
                     <input
                       {...register('state')}
-                      placeholder="Maharashtra"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                     />
                   </div>
@@ -346,7 +346,6 @@ export const Signup = () => {
                     </label>
                     <input
                       {...register('land_area')}
-                      placeholder="e.g. 8 Acres"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                     />
                   </div>
@@ -356,7 +355,6 @@ export const Signup = () => {
                     </label>
                     <input
                       {...register('upi_id')}
-                      placeholder="e.g. ramesh@okaxis"
                       className="w-full px-3 py-2 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold"
                     />
                   </div>
@@ -375,7 +373,6 @@ export const Signup = () => {
                     </label>
                     <input
                       {...register('business_name')}
-                      placeholder="FreshMandi Wholesale Pvt Ltd"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                     />
                   </div>
@@ -402,7 +399,6 @@ export const Signup = () => {
                     </label>
                     <input
                       {...register('address')}
-                      placeholder="Gate 3, APMC Market Yard"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                     />
                   </div>
@@ -410,7 +406,6 @@ export const Signup = () => {
                     <label className="block text-xs font-semibold text-slate-600 mb-1">{t('City')}</label>
                     <input
                       {...register('city')}
-                      placeholder="Mumbai / Delhi"
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                     />
                   </div>

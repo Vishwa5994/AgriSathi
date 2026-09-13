@@ -5,15 +5,7 @@ import toast from 'react-hot-toast';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    try {
-      const savedUser = localStorage.getItem('agri_user');
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch {
-      return null;
-    }
-  });
-
+  const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('agri_auth_token') || null);
   const [loading, setLoading] = useState(true);
 
@@ -28,13 +20,23 @@ export const AuthProvider = ({ children }) => {
             setUser(currentUser);
             localStorage.setItem('agri_user', JSON.stringify(currentUser));
           } else {
-            // Keep local user if backend verify endpoint is soft
-            const savedUser = localStorage.getItem('agri_user');
-            if (savedUser) setUser(JSON.parse(savedUser));
+            // Token is invalid/expired -> clear state so nobody is logged in automatically
+            setUser(null);
+            setToken(null);
+            localStorage.removeItem('agri_user');
+            localStorage.removeItem('agri_auth_token');
           }
         } catch {
-          // Keep saved user unless token is invalid
+          setUser(null);
+          setToken(null);
+          localStorage.removeItem('agri_user');
+          localStorage.removeItem('agri_auth_token');
         }
+      } else {
+        // No stored auth token -> ensure unauthenticated state
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem('agri_user');
       }
       setLoading(false);
     };
@@ -73,7 +75,7 @@ export const AuthProvider = ({ children }) => {
       setUser(res.user);
       setToken(res.token);
       toast.success(`Signed in as ${res.user.name || 'User'}!`);
-      return res.user;
+      return { user: res.user, isNewUser: res.isNewUser };
     } catch (err) {
       toast.error(err.message || 'Google Sign-In failed.');
       throw err;

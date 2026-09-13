@@ -20,7 +20,7 @@ export const authApi = {
     const payload = {
       name: userData.name,
       email: userData.email,
-      phone: userData.phone || '9876543210',
+      phone: userData.phone || '',
       password: userData.password,
       role: userData.role || 'FARMER'
     };
@@ -42,12 +42,12 @@ export const authApi = {
 
   loginWithGoogle: async (googleData) => {
     const response = await apiClient.post('/auth/google', {
+      access_token: googleData.access_token,
+      id_token: googleData.id_token,
+      credential: googleData.credential,
       email: googleData.email,
       name: googleData.name,
-      phone: googleData.phone,
-      role: googleData.role || 'FARMER',
-      picture: googleData.picture,
-      profile: googleData.profile
+      picture: googleData.picture
     });
     const data = response.data;
     if (data.error) {
@@ -59,7 +59,7 @@ export const authApi = {
     if (data.user) {
       localStorage.setItem('agri_user', JSON.stringify(data.user));
     }
-    return { user: data.user || data.data, token: data.token };
+    return { user: data.user || data.data, token: data.token, isNewUser: data.isNewUser };
   },
 
   getCurrentUser: async () => {
@@ -71,6 +71,22 @@ export const authApi = {
     } catch (e) {
       return null;
     }
+  },
+
+  updateUser: async (userId, userData) => {
+    const response = await apiClient.put(`/users/${userId}`, userData);
+    const data = response.data;
+    if (data.error) {
+      throw new Error(data.message || 'Failed to update user');
+    }
+    if (data.token) {
+      localStorage.setItem('agri_auth_token', data.token);
+    }
+    const updated = data.user || data.data;
+    if (updated) {
+      localStorage.setItem('agri_user', JSON.stringify(updated));
+    }
+    return updated;
   },
 
   updateProfile: async (userId, profileData, role = 'FARMER') => {
@@ -88,3 +104,4 @@ export const authApi = {
     return data.data || data.user || data;
   }
 };
+

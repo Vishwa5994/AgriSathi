@@ -9,6 +9,8 @@ import { Sprout, Lock, Mail, ArrowRight, Sparkles, UserCheck, X, CheckCircle2, S
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { GoogleProfileCompletionModal } from '../components/GoogleProfileCompletionModal';
+import { authApi } from '../api/authApi';
+import { triggerGoogleAuth } from '../utils/googleAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const GoogleIcon = ({ className = "w-5 h-5" }) => (
@@ -70,38 +72,23 @@ export const Login = () => {
     }
   };
 
-  const checkAndProceedGoogleLogin = async (googleUserData) => {
+  const handleGoogleCallback = async (authPayload) => {
+    setErrorMsg('');
     try {
-      const usersRaw = localStorage.getItem('agri_users');
-      const storedUsers = usersRaw ? JSON.parse(usersRaw) : MOCK_USERS;
-      const existing = storedUsers.find(
-        (u) => u.email?.toLowerCase() === (googleUserData.email || '').toLowerCase()
-      );
+      // 1. Authenticate with Google on Backend FIRST
+      const res = await loginWithGoogle(authPayload);
+      const user = res.user || res;
+      const isNewUser = res.isNewUser || user.role === 'PENDING' || !user.phone;
 
-      if (existing && existing.isProfileCompleted) {
-        const user = await loginWithGoogle({ ...googleUserData, role: existing.role });
-        navigateBasedOnRole(user.role);
-      } else if (googleUserData.isPresetDemo) {
-        const user = await loginWithGoogle({
-          ...googleUserData,
-          isProfileCompleted: true,
-          profile:
-            googleUserData.role === 'FARMER'
-              ? { village: 'Pimpalgaon', district: 'Nashik', state: 'Maharashtra', upi_id: 'ramesh.patel@okaxis' }
-              : { business_name: 'FreshMandi Wholesale Pvt Ltd', buyer_type: 'Wholesaler', city: 'Mumbai' }
-        });
-        navigateBasedOnRole(user.role);
-      } else {
-        setPendingGoogleUser({
-          email: googleUserData.email || '',
-          name: googleUserData.name || 'Google User',
-          role: googleUserData.role || 'FARMER',
-          picture: googleUserData.picture
-        });
+      if (isNewUser) {
+        setPendingGoogleUser(user);
         setIsProfileCompletionOpen(true);
+      } else {
+        navigateBasedOnRole(user.role);
       }
     } catch (e) {
-      setErrorMsg('Failed to process Google sign in');
+      console.error('Google login error:', e);
+      setErrorMsg(e.message || 'Google authentication failed.');
     }
   };
 
@@ -117,53 +104,26 @@ export const Login = () => {
         return;
       }
       const accessToken = params.get('access_token');
-      const stateRaw = params.get('state');
-      let role = 'FARMER';
-      try {
-        if (stateRaw) {
-          const parsedState = JSON.parse(decodeURIComponent(stateRaw));
-          if (parsedState?.role) role = parsedState.role;
-        }
-      } catch (e) {
-        console.error('Failed to parse OAuth state', e);
-      }
+      const idToken = params.get('id_token');
 
-      if (accessToken) {
-        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        })
-          .then((res) => res.json())
-          .then(async (googleUser) => {
-            window.history.replaceState(null, null, window.location.pathname);
-            if (googleUser.email) {
-              checkAndProceedGoogleLogin({
-                email: googleUser.email,
-                name: googleUser.name || googleUser.given_name,
-                role: role,
-                picture: googleUser.picture
-              });
-            } else {
-              setErrorMsg('Unable to retrieve email from Google account.');
-            }
-          })
-          .catch(async (err) => {
-            console.error('Google userinfo error:', err);
-            window.history.replaceState(null, null, window.location.pathname);
-            setErrorMsg('Failed to complete Google authentication.');
-          });
+      window.history.replaceState(null, null, window.location.pathname);
+
+      if (accessToken || idToken) {
+        handleGoogleCallback({ access_token: accessToken, id_token: idToken });
       }
     }
   }, [navigate]);
 
-  const handleCompleteGoogleProfile = async (fullUserData) => {
+  const handleCompleteGoogleProfile = async ({ role, phone }) => {
     setErrorMsg('');
     try {
-      const user = await loginWithGoogle(fullUserData);
+      if (!pendingGoogleUser?.user_id) return;
+      const updatedUser = await authApi.updateUser(pendingGoogleUser.user_id, { role, phone });
       setIsProfileCompletionOpen(false);
       setPendingGoogleUser(null);
-      navigateBasedOnRole(user.role);
+      navigateBasedOnRole(updatedUser?.role || role);
     } catch (e) {
-      setErrorMsg('Failed to process Google profile details');
+      setErrorMsg(e.message || 'Failed to complete profile details');
     }
   };
 
@@ -177,21 +137,13 @@ export const Login = () => {
     }
   };
 
-  const handleQuickDemo = (role) => {
+  const handleGoogleSignIn = () => {
     setErrorMsg('');
-    const demoUser = switchDemoRole(role);
-    if (demoUser) {
-      navigateBasedOnRole(demoUser.role);
-    }
-  };
-
-  const handleGoogleRedirect = (role = 'FARMER') => {
-    setErrorMsg('');
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '912210135-61me4mb0jupt8v1kkrvij3be06atlj88.apps.googleusercontent.com';
-    const redirectUri = `${window.location.origin}/login`;
-    const state = encodeURIComponent(JSON.stringify({ role }));
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile&state=${state}&prompt=select_account`;
-    window.location.href = googleAuthUrl;
+    triggerGoogleAuth({
+      onSuccess: (authPayload) => handleGoogleCallback(authPayload),
+      onError: (err) => setErrorMsg(typeof err === 'string' ? err : 'Google Sign-In failed'),
+      selectRole: 'FARMER'
+    });
   };
 
   return (
@@ -222,7 +174,7 @@ export const Login = () => {
           <div className="space-y-3">
             <button
               type="button"
-              onClick={() => handleGoogleRedirect()}
+              onClick={handleGoogleSignIn}
               className="w-full py-3 px-4 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl border border-slate-300 shadow-sm flex items-center justify-center gap-3 transition-all hover:shadow-md cursor-pointer group"
             >
               <GoogleIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
@@ -248,7 +200,6 @@ export const Login = () => {
                 <input
                   {...register('email')}
                   type="email"
-                  placeholder="ramesh.farmer@agrimarket.in"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all outline-none"
                 />
               </div>
@@ -266,7 +217,6 @@ export const Login = () => {
                 <input
                   {...register('password')}
                   type="password"
-                  placeholder="••••••••"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all outline-none"
                 />
               </div>
