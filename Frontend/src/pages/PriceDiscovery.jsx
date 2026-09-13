@@ -78,25 +78,28 @@ export const PriceDiscovery = () => {
   // Fetch ML metadata (commodities, crops, regions)
   useEffect(() => {
     predictionApi.getCommodities().then((res) => {
-      if (res?.commodities?.length > 0) {
-        setCommoditiesList(res.commodities);
-        if (!res.commodities.includes(selectedCommodity)) {
-          setSelectedCommodity(res.commodities[0]);
+      const list = Array.isArray(res) ? res : (res?.commodities || []);
+      if (list.length > 0) {
+        setCommoditiesList(list);
+        if (!list.includes(selectedCommodity)) {
+          setSelectedCommodity(list[0]);
         }
       }
     }).catch(console.error);
 
     predictionApi.getCropsAndRegions().then((res) => {
-      if (res?.crops?.length > 0) {
-        setCropsList(res.crops);
-        if (!res.crops.includes(selectedCrop)) {
-          setSelectedCrop(res.crops[0]);
+      const crops = res?.crops || (Array.isArray(res) ? res : []);
+      const regions = res?.regions || [];
+      if (crops.length > 0) {
+        setCropsList(crops);
+        if (!crops.includes(selectedCrop)) {
+          setSelectedCrop(crops[0]);
         }
       }
-      if (res?.regions?.length > 0) {
-        setRegionsList(res.regions);
-        if (!res.regions.includes(selectedRegion)) {
-          setSelectedRegion(res.regions[0]);
+      if (regions.length > 0) {
+        setRegionsList(regions);
+        if (!regions.includes(selectedRegion)) {
+          setSelectedRegion(regions[0]);
         }
       }
     }).catch(console.error);
