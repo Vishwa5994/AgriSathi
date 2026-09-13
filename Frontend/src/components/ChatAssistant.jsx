@@ -11,10 +11,6 @@ import {
   MessageCircle,
   X,
   Send,
-  Mic,
-  MicOff,
-  Volume2,
-  VolumeX,
   Bot,
   User,
   Sprout,
@@ -367,15 +363,11 @@ export const ChatAssistant = () => {
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [isListening, setIsListening] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [unread, setUnread] = useState(0);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const recognitionRef = useRef(null);
-  const synthRef = useRef(window.speechSynthesis);
 
   const chips = role === 'FARMER' ? FARMER_CHIPS : BUYER_CHIPS;
 
@@ -395,57 +387,6 @@ export const ChatAssistant = () => {
       setUnread(0);
     }
   }, [isOpen, messages]);
-
-  // Init Speech Recognition
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-IN';
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(transcript);
-        setIsListening(false);
-        // Auto-send after voice input
-        setTimeout(() => handleSend(transcript), 300);
-      };
-      recognition.onerror = () => setIsListening(false);
-      recognition.onend = () => setIsListening(false);
-      recognitionRef.current = recognition;
-    }
-    return () => {
-      recognitionRef.current?.abort();
-      synthRef.current?.cancel();
-    };
-  }, []);
-
-  const speakText = useCallback((text) => {
-    if (!voiceEnabled || !synthRef.current) return;
-    synthRef.current.cancel();
-    // Strip markdown symbols for TTS
-    const clean = text
-      .replace(/\*\*/g, '')
-      .replace(/━+/g, '')
-      .replace(/[🌾🧅🍅🌽📈📉📦💰🏪🛒🤖🌱🙏]/g, '')
-      .replace(/•/g, '')
-      .slice(0, 400); // limit TTS length
-
-    const utterance = new SpeechSynthesisUtterance(clean);
-    utterance.lang = 'en-IN';
-    utterance.rate = 0.95;
-    utterance.pitch = 1.05;
-    utterance.volume = 0.9;
-
-    // Prefer Indian English voice if available
-    const voices = synthRef.current.getVoices();
-    const indianVoice = voices.find(v => v.lang === 'en-IN') ||
-      voices.find(v => v.lang.startsWith('en'));
-    if (indianVoice) utterance.voice = indianVoice;
-
-    synthRef.current.speak(utterance);
-  }, [voiceEnabled]);
 
   const handleSend = useCallback(async (overrideText) => {
     const text = (overrideText ?? input).trim();
@@ -469,7 +410,6 @@ export const ChatAssistant = () => {
         const botMsg = { id: Date.now() + 1, from: 'bot', text: ragResponse.reply, time: new Date() };
         setMessages(prev => [...prev, botMsg]);
         setIsTyping(false);
-        speakText(ragResponse.reply);
         return;
       }
     } catch (backendErr) {
@@ -497,7 +437,6 @@ export const ChatAssistant = () => {
         const botMsg = { id: Date.now() + 1, from: 'bot', text: openRouterReply, time: new Date() };
         setMessages(prev => [...prev, botMsg]);
         setIsTyping(false);
-        speakText(openRouterReply);
         return;
       } catch (err) {
         console.warn('OpenRouter API call failed, falling back to local brain:', err);
@@ -510,24 +449,8 @@ export const ChatAssistant = () => {
       const botMsg = { id: Date.now() + 1, from: 'bot', text: responseText, time: new Date() };
       setMessages(prev => [...prev, botMsg]);
       setIsTyping(false);
-      speakText(responseText);
     }, 400);
-  }, [input, messages, role, user, speakText]);
-
-  const handleVoice = () => {
-    if (!recognitionRef.current) {
-      alert('Voice input is not supported in your browser. Please use Chrome or Edge.');
-      return;
-    }
-    if (isListening) {
-      recognitionRef.current.abort();
-      setIsListening(false);
-    } else {
-      synthRef.current?.cancel();
-      setIsListening(true);
-      recognitionRef.current.start();
-    }
-  };
+  }, [input, messages, role, user]);
 
   const handleChip = (chip) => {
     handleSend(chip.label);
@@ -614,20 +537,11 @@ export const ChatAssistant = () => {
                 <p className="text-sm font-black text-white leading-tight">AgriSaathi AI</p>
                 <p className="text-[10px] text-emerald-300 font-semibold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse inline-block" />
-                  Live Mandi Prices · Voice Assist
+                  Live Mandi Prices · AI Assistant
                 </p>
               </div>
 
               <div className="flex items-center gap-1">
-                {/* Voice toggle */}
-                <button
-                  onClick={() => { setVoiceEnabled(!voiceEnabled); synthRef.current?.cancel(); }}
-                  className={`p-2 rounded-xl transition-all cursor-pointer ${voiceEnabled ? 'bg-emerald-700/80 text-emerald-300' : 'bg-slate-700/40 text-slate-400'}`}
-                  title={voiceEnabled ? 'Voice ON – click to mute' : 'Voice OFF – click to enable'}
-                >
-                  {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                </button>
-
                 {/* Minimize */}
                 <button
                   onClick={() => setIsMinimized(!isMinimized)}
@@ -721,11 +635,6 @@ export const ChatAssistant = () => {
 
                 {/* ── INPUT BAR ── */}
                 <div className="px-3 py-3 bg-white border-t border-slate-100 shrink-0">
-                  {isListening && (
-                    <div className="mb-2 px-3 py-1.5 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 flex items-center gap-2 animate-pulse">
-                      <Mic className="w-3.5 h-3.5" /> Listening... speak now
-                    </div>
-                  )}
                   <div className="flex items-center gap-2 bg-slate-50 rounded-2xl border border-slate-200 focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-200 transition-all pr-1.5">
                     <input
                       ref={inputRef}
@@ -736,19 +645,6 @@ export const ChatAssistant = () => {
                       placeholder="Ask about mandi prices, crops..."
                       className="flex-1 bg-transparent px-4 py-3 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none"
                     />
-
-                    {/* Mic Button */}
-                    <button
-                      onClick={handleVoice}
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
-                        isListening
-                          ? 'bg-rose-500 text-white animate-pulse'
-                          : 'bg-slate-200 hover:bg-slate-300 text-slate-600'
-                      }`}
-                      title="Voice input"
-                    >
-                      {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                    </button>
 
                     {/* Send Button */}
                     <button

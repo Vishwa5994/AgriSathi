@@ -380,7 +380,7 @@ export const BuyerDashboard = () => {
           historicalData={commodityPrediction?.historical}
           forecastData={commodityPrediction?.forecast}
           commodityName={selectedCommodity}
-          unit="₹/Qtl"
+          unit="₹/Kg"
           height={260}
           loading={loadingCommodityPred}
         />

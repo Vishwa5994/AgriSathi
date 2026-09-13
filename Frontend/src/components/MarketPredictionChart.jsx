@@ -18,13 +18,14 @@ export const MarketPredictionChart = ({
   forecast = [],
   forecastData = [],
   commodityName = '',
-  unit = '₹/Qtl',
+  unit = '₹/Kg',
   type = 'price', // 'price' | 'demand'
   height = 260,
   compact = false,
   loading = false,
   error = null
 }) => {
+  const displayUnit = typeof unit === 'string' && /qtl|quintal/i.test(unit) ? unit.replace(/qtl|quintal/gi, 'Kg') : unit;
   const actualHistorical = (historical && historical.length > 0) ? historical : (historicalData || []);
   const actualForecast = (forecast && forecast.length > 0) ? forecast : (forecastData || []);
 
@@ -100,13 +101,13 @@ export const MarketPredictionChart = ({
           {histVal !== undefined && histVal !== null && (
             <p className="text-emerald-400 font-black flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              Actual: {type === 'price' ? `₹${histVal.toLocaleString('en-IN')}` : histVal.toLocaleString('en-IN')} {unit}
+              Actual: {type === 'price' ? `₹${histVal.toLocaleString('en-IN')}` : histVal.toLocaleString('en-IN')} {displayUnit}
             </p>
           )}
           {isPredicted && (
             <p className="text-amber-300 font-black flex items-center gap-1.5">
               <Sparkles className="w-3 h-3 text-amber-400 animate-pulse" />
-              ML Forecast: {type === 'price' ? `₹${foreVal.toLocaleString('en-IN')}` : foreVal.toLocaleString('en-IN')} {unit}
+              ML Forecast: {type === 'price' ? `₹${foreVal.toLocaleString('en-IN')}` : foreVal.toLocaleString('en-IN')} {displayUnit}
             </p>
           )}
         </div>

@@ -425,7 +425,7 @@ export const FarmerDashboard = () => {
           historicalData={cropPrediction?.historical}
           forecastData={cropPrediction?.forecast}
           commodityName={selectedCrop}
-          unit="₹/Qtl"
+          unit="₹/Kg"
           height={260}
           loading={loadingPred}
         />

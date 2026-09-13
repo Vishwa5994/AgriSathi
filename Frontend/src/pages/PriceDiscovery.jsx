@@ -287,7 +287,7 @@ export const PriceDiscovery = () => {
                   <div className="text-right">
                     <span className="text-[11px] font-bold text-slate-500 uppercase block">Next Mo. Predict</span>
                     <span className="text-base font-black text-emerald-700">
-                      ₹{pricePrediction.predicted_price?.toFixed(2)}/Qtl
+                      ₹{pricePrediction.predicted_price?.toFixed(2)}/Kg
                     </span>
                   </div>
                 )}
@@ -300,7 +300,7 @@ export const PriceDiscovery = () => {
                 forecastData={pricePrediction?.forecast}
                 currentValue={pricePrediction?.current_price}
                 predictedValue={pricePrediction?.predicted_price}
-                unit="₹/Qtl"
+                unit="₹/Kg"
                 loading={loadingPricePred}
                 error={pricePredError}
               />
