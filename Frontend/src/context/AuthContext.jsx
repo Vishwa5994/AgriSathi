@@ -5,9 +5,16 @@ import toast from 'react-hot-toast';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem('agri_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [token, setToken] = useState(() => localStorage.getItem('agri_auth_token') || null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Initialize and verify authentication on app start / page refresh
   useEffect(() => {
@@ -19,18 +26,15 @@ export const AuthProvider = ({ children }) => {
           if (currentUser) {
             setUser(currentUser);
             localStorage.setItem('agri_user', JSON.stringify(currentUser));
-          } else {
-            // Token is invalid/expired -> clear state so nobody is logged in automatically
+          }
+        } catch (err) {
+          // Only clear session if token is explicitly rejected (401 Unauthorized)
+          if (err?.response?.status === 401) {
             setUser(null);
             setToken(null);
             localStorage.removeItem('agri_user');
             localStorage.removeItem('agri_auth_token');
           }
-        } catch {
-          setUser(null);
-          setToken(null);
-          localStorage.removeItem('agri_user');
-          localStorage.removeItem('agri_auth_token');
         }
       } else {
         // No stored auth token -> ensure unauthenticated state
