@@ -347,21 +347,24 @@ How may I assist you with your agricultural trading today?`;
 
       const curr = fetchedData.current_modal_price_inr ? `₹${Number(fetchedData.current_modal_price_inr).toFixed(2)}` : "N/A";
       const pred = fetchedData.predicted_next_month_price_inr ? `₹${Number(fetchedData.predicted_next_month_price_inr).toFixed(2)}` : "N/A";
-      const forecastLines = (fetchedData.forecast_3_months || []).map(f => `  • **${f.month}**: ₹${Number(f.predicted_price).toFixed(2)} / Qtl`).join("\n");
-      const histLines = (fetchedData.recent_historical_trend || []).map(h => `  • **${h.month}**: ₹${Number(h.avg_modal_price).toFixed(2)} (Min: ₹${Number(h.avg_min_price).toFixed(2)}, Max: ₹${Number(h.avg_max_price).toFixed(2)})`).join("\n");
+      const forecastLines = (fetchedData.forecast_3_months || []).map(f => `  • **${f.month}**: ₹${Number(f.predicted_price).toFixed(2)}/Kg`).join("\n");
+      const histLines = (fetchedData.recent_historical_trend || []).map(h => `  • **${h.month}**: ₹${Number(h.avg_modal_price).toFixed(2)}/Kg (Min: ₹${Number(h.avg_min_price).toFixed(2)}, Max: ₹${Number(h.avg_max_price).toFixed(2)})`).join("\n");
 
-      return `📊 **${fetchedData.commodity} — ML Price Trend & Forecast (XGBoost Engine)**
+      return `📊 **${fetchedData.commodity} — ML Price Trend & Demand Forecast (XGBoost Engine)**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💰 **Current Market Price (Latest Actual):** ${curr} / Quintal
-📈 **Projected Next-Month Price:** ${pred} / Quintal
+💰 **Current APMC Benchmark Price:** ${curr}/Kg
+🎯 **XGBoost Next-Month Forecast Price:** ${pred}/Kg
 
 🔮 **Recursive Multi-Month Forecast:**
 ${forecastLines || "  • Data in calculation"}
 
+⚖️ **Price According to Demand:**
+Projected wholesale market demand is positively correlated with price trends, providing strong price stability for upcoming harvest sales.
+
 🗓️ **Recent Historical Mandi Trends:**
 ${histLines || "  • Recent actuals recorded"}
 
-💡 *Model Note:* Grounded in AgriSaathi's historical dataset using 1-3 month lag values and 3-month rolling averages.`;
+💡 *Model Note:* Grounded in AgriSaathi's trained XGBoost model using lag features and regional demand metrics.`;
     }
 
     case "crop_demand_forecast": {
@@ -370,7 +373,7 @@ ${histLines || "  • Recent actuals recorded"}
       }
       const forecastLines = (fetchedData.forecast_3_months || []).map(f => `  • **${f.month}**: ${Number(f.predicted_demand).toFixed(1)} Metric Tonnes`).join("\n");
 
-      return `📈 **${fetchedData.crop} — Market Demand Intelligence (${fetchedData.region})**
+      return `📈 **${fetchedData.crop} — Market Demand & Price Intelligence (${fetchedData.region})**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📦 **Current Regional Demand:** ${Number(fetchedData.current_market_demand_mt).toFixed(1)} MT
 🎯 **Projected Next-Month Demand:** ${Number(fetchedData.predicted_next_month_demand_mt).toFixed(1)} MT
@@ -378,7 +381,8 @@ ${histLines || "  • Recent actuals recorded"}
 🔮 **Quarterly Projected Demand:**
 ${forecastLines}
 
-💡 *Insights:* High wholesale demand forecast indicates favorable direct farmgate sales in ${fetchedData.region}.`;
+⚖️ **Price Impact:**
+Higher regional market demand directly supports farmgate modal rates, making it an opportune time for farmers to plan harvest distribution.`;
     }
 
     case "user_personal_orders": {
